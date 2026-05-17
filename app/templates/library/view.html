@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.tournament_name }} — Library{% endblock %}
+{% block content %}
+<header class="results-header">
+  <h1>{{ tournament.tournament_name }}</h1>
+  <p class="muted">{{ tournament.location }} · {{ tournament.start_date }} – {{ tournament.end_date }}</p>
+  <p>Showing results for <strong>{{ club_name }}</strong></p>
+  <p class="muted">Saved {{ saved.saved_at.strftime('%Y-%m-%d %H:%M') }} UTC</p>
+
+  <div class="results-actions">
+    <a href="{{ url_for('library.pdf', saved_id=saved.id) }}" class="btn btn-primary">Export PDF</a>
+    <form method="post" action="{{ url_for('library.delete', saved_id=saved.id) }}" class="inline-form" onsubmit="return confirm('Remove this tournament from your library?');">
+      <button type="submit" class="btn btn-danger">Remove from Library</button>
+    </form>
+  </div>
+</header>
+
+{% set pdf_mode = false %}
+{% include "tournaments/_results_body.html" %}
+
+<p><a href="{{ url_for('library.index') }}">← Back to Library</a></p>
+
+{% if events %}
+<script src="{{ url_for('static', filename='js/tabs.js') }}"></script>
+{% endif %}
+{% endblock %}

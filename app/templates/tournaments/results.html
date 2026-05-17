@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.tournament_name }} — Results{% endblock %}
+{% block content %}
+<header class="results-header">
+  <h1>{{ tournament.tournament_name }}</h1>
+  <p class="muted">{{ tournament.location }} · {{ tournament.start_date }} – {{ tournament.end_date }}</p>
+  <p>Showing results for <strong>{{ club.name }}</strong></p>
+
+  <form method="get" class="form-inline club-switcher">
+    <label>Switch club
+      <select name="club_id" onchange="this.form.submit()">
+        {% for c in clubs %}
+        <option value="{{ c.id }}" {% if c.id == club.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+
+  <div class="results-actions">
+    <form method="post" action="{{ url_for('library.save') }}" class="inline-form">
+      <input type="hidden" name="tournament_id" value="{{ tournament_id }}">
+      <input type="hidden" name="club_id" value="{{ club.id }}">
+      <button type="submit" class="btn btn-primary">Save to Library</button>
+    </form>
+    <a href="{{ url_for('tournaments.results_pdf', tournament_id=tournament_id, club_id=club.id) }}" class="btn btn-primary">Export PDF</a>
+  </div>
+</header>
+
+{% set pdf_mode = false %}
+{% include "tournaments/_results_body.html" %}
+
+<p><a href="{{ url_for('tournaments.index') }}">← Search another tournament</a></p>
+
+{% if events %}
+<script src="{{ url_for('static', filename='js/tabs.js') }}"></script>
+{% endif %}
+{% endblock %}

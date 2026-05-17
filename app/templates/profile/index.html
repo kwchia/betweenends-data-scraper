@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Profile — Betweenends Coach{% endblock %}
+{% block content %}
+<h1>Your clubs</h1>
+<p>Configure clubs and aliases to match archers on Betweenends (team/club field).</p>
+<a href="{{ url_for('profile.new_club') }}" class="btn btn-primary">Add club</a>
+
+{% if clubs %}
+<ul class="club-list">
+  {% for club in clubs %}
+  <li>
+    <a href="{{ url_for('profile.edit_club', club_id=club.id) }}">{{ club.name }}</a>
+    {% if club.is_default %}<span class="badge">Default</span>{% endif %}
+    <span class="muted">{{ club.aliases|length }} alias(es)</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="muted">No clubs yet. Add your first club to get started.</p>
+{% endif %}
+{% endblock %}

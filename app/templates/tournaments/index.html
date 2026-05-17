@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Tournaments — Betweenends Coach{% endblock %}
+{% block content %}
+<h1>Find tournament results</h1>
+<p>Search for a tournament and select your club to see filtered results for your athletes.</p>
+
+{% if not clubs %}
+<p class="flash flash-error"><a href="{{ url_for('profile.new_club') }}">Add a club</a> before searching.</p>
+{% else %}
+<form method="get" id="search-form" class="form-card">
+  <label>Tournament name
+    <input type="text" id="tournament-search" name="q" autocomplete="off" placeholder="Start typing tournament name...">
+    <input type="hidden" id="tournament-id" name="tournament_id">
+    <ul id="search-results" class="search-dropdown"></ul>
+  </label>
+  <div id="selected-tournament" class="selected-tournament"></div>
+
+  <label>Club
+    <select name="club_id" id="club-select">
+      {% for club in clubs %}
+      <option value="{{ club.id }}" {% if default_club and club.id == default_club.id %}selected{% endif %}>{{ club.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <button type="submit" id="view-results" class="btn btn-primary" disabled>View results</button>
+</form>
+
+<script>
+  window.TOURNAMENT_RESULTS_URL = {{ url_for('tournaments.results', tournament_id=0) | tojson }};
+  window.TOURNAMENT_SEARCH_URL = {{ url_for('tournaments.search') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/tournament_search.js') }}?v=2"></script>
+{% endif %}
+{% endblock %}

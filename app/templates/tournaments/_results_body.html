@@ -1,0 +1,15 @@
+{% if not events %}
+<p class="flash flash-info">No results found for this club in this tournament. Check your club aliases in <a href="{{ url_for('profile.index') }}">profile</a>.</p>
+{% elif pdf_mode %}
+{% include "tournaments/_results_sections.html" %}
+{% else %}
+<div class="tabs" data-tabs>
+  <div class="tab-bar">
+    <button type="button" class="tab active" data-tab="summary">Summary</button>
+    {% for event in events %}
+    <button type="button" class="tab" data-tab="event-{{ event.event_id }}">{{ event.event_name }}</button>
+    {% endfor %}
+  </div>
+  {% include "tournaments/_results_sections.html" %}
+</div>
+{% endif %}

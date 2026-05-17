@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ tournament.tournament_name }} — Results</title>
+  <style>
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #1a2332; }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    h2 { font-size: 14px; margin-top: 18px; page-break-after: avoid; }
+    h3 { font-size: 12px; }
+    .muted { color: #5c6b7a; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; }
+    th, td { border: 1px solid #dde3ea; padding: 4px 6px; text-align: left; }
+    th { background: #eceff1; }
+    tr.winner { background: #e8f5e9; }
+    .tab-panel { display: block !important; }
+    .pdf-section { page-break-before: always; }
+    .pdf-section:first-of-type { page-break-before: auto; }
+    .stat-row { margin: 8px 0; }
+    .medal { font-weight: bold; }
+    .section-summary { color: #5c6b7a; font-size: 10px; margin: 2px 0 8px; }
+    .division { margin-bottom: 16px; }
+    .archer-block { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <h1>{{ tournament.tournament_name }}</h1>
+  <p class="muted">{{ tournament.location }} · {{ tournament.start_date }} – {{ tournament.end_date }}</p>
+  <p>Results for <strong>{{ club_name }}</strong></p>
+
+  {% set pdf_mode = true %}
+  {% include "tournaments/_results_body.html" %}
+</body>
+</html>

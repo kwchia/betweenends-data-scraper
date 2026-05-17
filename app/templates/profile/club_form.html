@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{% if club %}Edit{% else %}New{% endif %} club — Betweenends Coach{% endblock %}
+{% block content %}
+<h1>{% if club %}Edit club{% else %}New club{% endif %}</h1>
+
+<form method="post" class="form-card">
+  <label>Club name <input type="text" name="name" value="{{ club.name if club else '' }}" required></label>
+  <label class="checkbox">
+    <input type="checkbox" name="is_default" {% if club and club.is_default %}checked{% endif %}>
+    Set as default club
+  </label>
+  {% if not club %}
+  <label>Aliases (one per line)
+    <textarea name="aliases" rows="4" placeholder="UCLA Archery&#10;UCLA"></textarea>
+  </label>
+  {% endif %}
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+{% if club %}
+<section class="section">
+  <h2>Aliases</h2>
+  <ul>
+    {% for alias in aliases %}
+    <li>
+      {{ alias.alias }} <span class="muted">({{ alias.match_mode }})</span>
+      <form method="post" action="{{ url_for('profile.delete_alias', club_id=club.id, alias_id=alias.id) }}" class="inline-form">
+        <button type="submit" class="btn btn-small btn-danger">Remove</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="muted">No aliases — the club name will be used for matching.</li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="{{ url_for('profile.add_alias', club_id=club.id) }}" class="form-inline">
+    <input type="text" name="alias" placeholder="Alias text" required>
+    <select name="match_mode">
+      <option value="contains">Contains</option>
+      <option value="exact">Exact</option>
+    </select>
+    <button type="submit" class="btn btn-small">Add alias</button>
+  </form>
+</section>
+
+<form method="post" action="{{ url_for('profile.delete_club', club_id=club.id) }}" onsubmit="return confirm('Delete this club?');">
+  <button type="submit" class="btn btn-danger">Delete club</button>
+</form>
+{% endif %}
+
+<p><a href="{{ url_for('profile.index') }}">Back to clubs</a></p>
+{% endblock %}

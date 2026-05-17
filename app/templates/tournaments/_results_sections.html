@@ -1,0 +1,65 @@
+  <div class="tab-panel{% if pdf_mode %} pdf-section{% else %} active{% endif %}" id="summary">
+    <div class="summary-grid">
+      <div class="stat-card">
+        <h3>Medals</h3>
+        <p><span class="medal gold">{{ summary.medals.gold }}</span> Gold</p>
+        <p><span class="medal silver">{{ summary.medals.silver }}</span> Silver</p>
+        <p><span class="medal bronze">{{ summary.medals.bronze }}</span> Bronze</p>
+      </div>
+      <div class="stat-card">
+        <h3>Overview</h3>
+        <p>{{ summary.total_archers }} archer(s) across {{ summary.total_events_with_results }} event(s)</p>
+      </div>
+      {% if summary.finish_histogram %}
+      <div class="stat-card">
+        <h3>Finishes</h3>
+        <ul>
+          {% for label, count in summary.finish_histogram.items() %}
+          <li>{{ label }}: {{ count }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if summary.highlights %}
+    <section class="section">
+      <h2>Highlights</h2>
+      <ul class="highlights">
+        {% for h in summary.highlights %}
+        <li class="highlight-{{ h.kind }}">
+          <strong>{{ h.title }}</strong>
+          <span class="muted">{{ h.detail }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+
+  {% for event in events %}
+  <div class="tab-panel{% if pdf_mode %} pdf-section{% endif %}" id="event-{{ event.event_id }}">
+    <h2>{{ event.event_name }} <span class="badge">{{ event.event_type }}</span></h2>
+
+    {% for division in event.divisions %}
+    {% set div_summary = division_summary(event, division) %}
+    {% if pdf_mode %}
+    <section class="division division-expanded">
+      <h3>{{ division.name }}</h3>
+      {% if div_summary %}<p class="section-summary">{{ div_summary }}</p>{% endif %}
+      {% include "tournaments/_division_results.html" %}
+    </section>
+    {% else %}
+    <details class="collapsible division-collapse">
+      <summary class="collapsible-summary">
+        <span class="collapsible-title">{{ division.name }}</span>
+        {% if div_summary %}<span class="section-summary">{{ div_summary }}</span>{% endif %}
+      </summary>
+      <div class="collapsible-body">
+        {% include "tournaments/_division_results.html" %}
+      </div>
+    </details>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}

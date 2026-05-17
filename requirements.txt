@@ -1,0 +1,12 @@
+Flask==3.1.0
+Flask-Login==0.6.3
+Flask-Migrate==4.1.0
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.10
+httpx==0.28.1
+gunicorn==23.0.0
+python-dotenv==1.0.1
+pytest==8.3.4
+pytest-cov==6.0.0
+xhtml2pdf==0.2.16

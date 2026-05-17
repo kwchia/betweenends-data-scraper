@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Library — Betweenends Coach{% endblock %}
+{% block content %}
+<h1>Library</h1>
+<p class="muted">Saved tournament results for your clubs.</p>
+
+{% if saved %}
+<table class="results-table library-table">
+  <thead>
+    <tr>
+      <th>
+        <a href="{{ url_for('library.index', sort='name', dir='asc' if sort != 'name' or direction == 'desc' else 'desc') }}" class="sort-link{% if sort == 'name' %} active{% endif %}">
+          Tournament{% if sort == 'name' %} {{ '↑' if direction == 'asc' else '↓' }}{% endif %}
+        </a>
+      </th>
+      <th>Club</th>
+      <th>
+        <a href="{{ url_for('library.index', sort='date', dir='asc' if sort != 'date' or direction == 'desc' else 'desc') }}" class="sort-link{% if sort == 'date' %} active{% endif %}">
+          Tournament date{% if sort == 'date' %} {{ '↑' if direction == 'asc' else '↓' }}{% endif %}
+        </a>
+      </th>
+      <th>Saved</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in saved %}
+    <tr>
+      <td><a href="{{ url_for('library.view', saved_id=item.id) }}">{{ item.tournament_name }}</a></td>
+      <td>{{ item.club_name }}</td>
+      <td>
+        {% if item.start_date %}
+        {{ item.start_date }}{% if item.end_date and item.end_date != item.start_date %} – {{ item.end_date }}{% endif %}
+        {% else %}
+        <span class="muted">—</span>
+        {% endif %}
+      </td>
+      <td class="muted">{{ item.saved_at.strftime('%Y-%m-%d %H:%M') }} UTC</td>
+      <td class="library-actions">
+        <a href="{{ url_for('library.pdf', saved_id=item.id) }}" class="btn btn-small btn-primary">PDF</a>
+        <form method="post" action="{{ url_for('library.delete', saved_id=item.id) }}" class="inline-form" onsubmit="return confirm('Remove this tournament from your library?');">
+          <button type="submit" class="btn btn-small btn-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No saved tournaments yet. Search for a tournament and use <strong>Save to Library</strong> on the results page.</p>
+<p><a href="{{ url_for('tournaments.index') }}" class="btn btn-primary">Search tournaments</a></p>
+{% endif %}
+{% endblock %}
