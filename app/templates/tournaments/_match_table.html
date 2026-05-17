@@ -1,0 +1,26 @@
+        <table class="results-table match-table">
+          <thead>
+            <tr>
+              <th>Competitor</th>
+              <th>Target</th>
+              {% if match.sides and match.sides[0].end_scores %}
+              {% for e in match.sides[0].end_scores %}
+              <th>End {{ e.end_number }}</th>
+              {% endfor %}
+              {% endif %}
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for side in match.sides %}
+            <tr class="{% if side.won %}winner{% endif %}">
+              <td>{{ side.name }}</td>
+              <td>{{ side.target }}</td>
+              {% for e in side.end_scores %}
+              <td>{{ e.display }}</td>
+              {% endfor %}
+              <td><strong>{{ side.total }}</strong></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>

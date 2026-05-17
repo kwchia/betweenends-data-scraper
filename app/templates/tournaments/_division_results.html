@@ -1,0 +1,83 @@
+      {% if event.event_type in ['RankingEvent', 'CombinedRankingEvent'] %}
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Archer</th>
+            <th>Club</th>
+            <th>Total</th>
+            {% if division.archers and division.archers[0].round_scores %}
+            {% for i in range(division.archers[0].round_scores|length) %}
+            <th>Rnd {{ i + 1 }}</th>
+            {% endfor %}
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for archer in division.archers %}
+          <tr>
+            <td>{{ archer.rank }}</td>
+            <td>{{ archer.name }}</td>
+            <td>{{ archer.club }}</td>
+            <td>{{ archer.total_score }}</td>
+            {% for rs in archer.round_scores %}
+            <td>{{ rs }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% elif event.event_type == 'CustomPointsEvent' %}
+      <table class="results-table">
+        <thead><tr><th>Rank</th><th>Team</th><th>Points</th></tr></thead>
+        <tbody>
+          {% for archer in division.archers %}
+          <tr>
+            <td>{{ archer.rank }}</td>
+            <td>{{ archer.name }}</td>
+            <td>{{ archer.points|round(1) if archer.points else '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% elif event.event_type == 'MatchEvent' %}
+      {% for archer in division.archers %}
+      {% set archer_text = archer_summary(event, archer) %}
+      {% if pdf_mode %}
+      <section class="archer-block">
+        <h4>{{ archer.name }} <span class="muted">[{{ archer.club }}]</span></h4>
+        {% if archer_text %}<p class="section-summary">{{ archer_text }}</p>{% endif %}
+        {% for match in archer.matches|sort(attribute='round_index', reverse=true) %}
+        {% set match_text = match_summary(match, archer.name) %}
+        <div class="match-card">
+          <h5>{{ match.round_name }}{% if match_text %} <span class="muted">— {{ match_text }}</span>{% endif %}</h5>
+          {% include "tournaments/_match_table.html" %}
+        </div>
+        {% endfor %}
+      </section>
+      {% else %}
+      <details class="collapsible archer-collapse">
+        <summary class="collapsible-summary">
+          <span class="collapsible-title">{{ archer.name }} <span class="muted">[{{ archer.club }}]</span></span>
+          {% if archer_text %}<span class="section-summary">{{ archer_text }}</span>{% endif %}
+        </summary>
+        <div class="collapsible-body">
+          {% for match in archer.matches|sort(attribute='round_index', reverse=true) %}
+          {% set match_text = match_summary(match, archer.name) %}
+          <details class="collapsible match-collapse">
+            <summary class="collapsible-summary match-summary-line">
+              <span class="collapsible-title">{{ match.round_name }}</span>
+              {% if match_text %}<span class="section-summary">{{ match_text }}</span>{% endif %}
+            </summary>
+            <div class="collapsible-body match-card">
+              {% include "tournaments/_match_table.html" %}
+            </div>
+          </details>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% endfor %}
+      {% endif %}
