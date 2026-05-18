@@ -6,6 +6,7 @@ from app.services.event_parsers import ArcherResult, EventResult, MatchResult, M
 
 _MATCH_RANK_SUFFIX = re.compile(r"\s+\(\d+\)$")
 _INDIVIDUAL_EVENT_TYPES = frozenset({"RankingEvent", "CombinedRankingEvent", "MatchEvent"})
+_RANKING_HIGHLIGHT_MAX_PLACE = 10
 
 
 @dataclass
@@ -185,14 +186,13 @@ def build_summary(events: list[EventResult]) -> TournamentSummary:
                     _apply_rank_medals(summary, rank, event.event_name, detail, archer.name)
                     if rank:
                         _record_finish(summary, event.event_name, f"Rank {rank}")
-                    if archer.total_score is not None:
-                        summary.highlights.append(
-                            Highlight(
-                                kind="top_score",
-                                title=f"{archer.name} — {archer.total_score}",
-                                detail=f"{division.name} in {event.event_name}",
-                                event_name=event.event_name,
-                            )
+                    if event.event_type in ("RankingEvent", "CombinedRankingEvent"):
+                        _maybe_add_ranking_highlight(
+                            summary,
+                            archer,
+                            rank,
+                            division.name,
+                            event.event_name,
                         )
                 elif event.event_type == "MatchEvent":
                     _apply_match_bracket_medals(
@@ -215,8 +215,44 @@ def build_summary(events: list[EventResult]) -> TournamentSummary:
     summary.individual_roster = build_individual_roster(events)
     summary.team_roster = build_team_roster(events)
     summary.highlights = _dedupe_highlights(summary.highlights)
-    summary.highlights.sort(key=lambda h: (h.kind != "comeback", h.kind != "close_match", h.title))
+    summary.highlights.sort(
+        key=lambda h: (
+            h.kind != "medal",
+            h.kind != "top_finish",
+            h.kind != "comeback",
+            h.kind != "close_match",
+            h.title,
+        )
+    )
     return summary
+
+
+def _ordinal(rank: int) -> str:
+    if 10 <= rank % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")
+    return f"{rank}{suffix}"
+
+
+def _maybe_add_ranking_highlight(
+    summary: TournamentSummary,
+    archer: ArcherResult,
+    rank: int | None,
+    division_name: str,
+    event_name: str,
+) -> None:
+    if not rank or rank > _RANKING_HIGHLIGHT_MAX_PLACE:
+        return
+    score_fragment = f" ({archer.total_score} pts)" if archer.total_score is not None else ""
+    summary.highlights.append(
+        Highlight(
+            kind="top_finish",
+            title=f"{archer.name} — {_ordinal(rank)}",
+            detail=f"{division_name} in {event_name}{score_fragment}",
+            event_name=event_name,
+        )
+    )
 
 
 def _record_finish(summary: TournamentSummary, event_name: str, label: str) -> None:

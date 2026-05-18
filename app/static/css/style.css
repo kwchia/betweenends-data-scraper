@@ -183,6 +183,7 @@ input[type="text"], input[type="email"], input[type="password"], select, textare
 .highlights { list-style: none; padding: 0; }
 .highlights li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
 .highlight-comeback strong { color: var(--success); }
+.highlight-top_finish strong { color: var(--accent, #1565c0); }
 
 .club-list { list-style: none; padding: 0; }
 .club-list li { padding: 0.75rem; background: var(--card); border: 1px solid var(--border); margin-bottom: 0.5rem; border-radius: 6px; }

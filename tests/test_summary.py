@@ -268,6 +268,26 @@ def test_finishes_grouped_by_event():
     assert summary.finishes_by_event["Qualification"]["Rank 1"] == 1
 
 
+def test_ranking_highlights_only_for_top_ten():
+    events = [
+        _ranking_event(
+            [
+                ArcherResult(name="Podium Archer", club="Club", rank=3, total_score=600),
+                ArcherResult(name="Mid Archer", club="Club", rank=10, total_score=550),
+                ArcherResult(name="Outside Archer", club="Club", rank=11, total_score=540),
+                ArcherResult(name="Deep Archer", club="Club", rank=32, total_score=500),
+            ]
+        )
+    ]
+    summary = build_summary(events)
+    titles = {h.title for h in summary.highlights}
+    assert "Podium Archer — 3rd" in titles
+    assert "Mid Archer — 10th" in titles
+    assert "Outside Archer — 11th" not in titles
+    assert "Deep Archer — 32nd" not in titles
+    assert all(h.kind == "top_finish" for h in summary.highlights if h.kind != "medal")
+
+
 def test_medal_winners_for_podium_ranks():
     events = [
         _ranking_event(
