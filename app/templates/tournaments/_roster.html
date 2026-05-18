@@ -1,0 +1,49 @@
+{% if summary.individual_roster %}
+<section class="roster-section">
+  <h3>Individual archers <span class="muted">({{ summary.individual_roster|length }})</span></h3>
+  <table class="results-table roster-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Category</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in summary.individual_roster %}
+        {% for category in entry.categories %}
+        <tr>
+          <td>{{ entry.name }}</td>
+          <td>{{ category }}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if summary.team_roster %}
+<section class="roster-section">
+  <h3>Teams <span class="muted">({{ summary.team_roster|length }})</span></h3>
+  <table class="results-table roster-table">
+    <thead>
+      <tr>
+        <th>Event</th>
+        <th>Category</th>
+        <th>Rank</th>
+        <th>Points</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in summary.team_roster %}
+      <tr>
+        <td>{{ entry.event_name }}</td>
+        <td>{{ entry.category }}</td>
+        <td>{% if entry.rank %}{{ entry.rank }}{% else %}—{% endif %}</td>
+        <td>{% if entry.points is not none %}{{ entry.points }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}

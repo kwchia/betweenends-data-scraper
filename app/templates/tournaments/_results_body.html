@@ -6,6 +6,9 @@
 <div class="tabs" data-tabs>
   <div class="tab-bar">
     <button type="button" class="tab active" data-tab="summary">Summary</button>
+    {% if summary.individual_roster or summary.team_roster %}
+    <button type="button" class="tab" data-tab="roster">Roster{% if not pdf_mode %} ({{ summary.individual_roster|length }} individuals · {{ summary.team_roster|length }} teams){% endif %}</button>
+    {% endif %}
     {% for event in events %}
     <button type="button" class="tab" data-tab="event-{{ event.event_id }}">{{ event.event_name }}</button>
     {% endfor %}

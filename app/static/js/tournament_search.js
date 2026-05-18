@@ -14,6 +14,20 @@
 
   let debounceTimer;
 
+  function showLoading() {
+    var existing = document.getElementById("results-loading");
+    if (existing) {
+      existing.hidden = false;
+      return;
+    }
+    var overlay = document.createElement("div");
+    overlay.id = "results-loading";
+    overlay.className = "results-loading";
+    overlay.setAttribute("role", "status");
+    overlay.innerHTML = "<p>Compiling results… this may take a minute.</p>";
+    document.body.appendChild(overlay);
+  }
+
   searchInput.addEventListener("input", function () {
     clearTimeout(debounceTimer);
     const q = searchInput.value.trim();
@@ -50,6 +64,9 @@
     const tid = tournamentIdInput.value;
     const clubId = clubSelect.value;
     if (!tid) return;
+    viewBtn.disabled = true;
+    viewBtn.textContent = "Loading…";
+    showLoading();
     const path = resultsUrlTemplate.replace("/0/", "/" + tid + "/");
     window.location.href = path + "?club_id=" + encodeURIComponent(clubId);
   });
