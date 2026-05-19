@@ -57,8 +57,8 @@ def test_ranking_filters_by_club():
     assert result.divisions[0].archers[0].rank == 1
 
 
-def test_ranking_uses_tournament_rank_not_club_only_rank():
-    """Archer list order from the API is overall division standing."""
+def test_ranking_uses_score_standings_not_list_order():
+    """Rank is computed from scores across the full division, not ars list position."""
     event = {
         **RANKING_EVENT,
         "cgs": [
@@ -76,7 +76,7 @@ def test_ranking_uses_tournament_rank_not_club_only_rank():
         aliases,
     )
     assert len(result.divisions[0].archers) == 1
-    assert result.divisions[0].archers[0].rank == 2
+    assert result.divisions[0].archers[0].rank == 1
 
 
 def test_summary_from_ranking():

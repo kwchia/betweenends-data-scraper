@@ -1,21 +1,83 @@
 {% extends "base.html" %}
 {% block title %}Profile — Betweenends Coach{% endblock %}
 {% block content %}
-<h1>Your clubs</h1>
-<p>Configure clubs and aliases to match archers on Betweenends (team/club field).</p>
-<a href="{{ url_for('profile.new_club') }}" class="btn btn-primary">Add club</a>
+<h1>Profile</h1>
 
-{% if clubs %}
-<ul class="club-list">
-  {% for club in clubs %}
-  <li>
-    <a href="{{ url_for('profile.edit_club', club_id=club.id) }}">{{ club.name }}</a>
-    {% if club.is_default %}<span class="badge">Default</span>{% endif %}
-    <span class="muted">{{ club.aliases|length }} alias(es)</span>
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<p class="muted">No clubs yet. Add your first club to get started.</p>
-{% endif %}
+<section class="section">
+  <h2>Your archer identity</h2>
+  <p class="muted">Used to find your results in My Results mode.</p>
+  <form method="post" action="{{ url_for('profile.save_archer_identity') }}" class="form-card">
+    <label>First name
+      <input type="text" name="first_name" value="{{ current_user.first_name or '' }}" required>
+    </label>
+    <label>Last name
+      <input type="text" name="last_name" value="{{ current_user.last_name or '' }}" required>
+    </label>
+    <button type="submit" class="btn btn-primary">Save name</button>
+  </form>
+
+  <h3>Name aliases</h3>
+  <p class="muted">Alternate spellings or names you've competed under (one per line when adding).</p>
+  {% if name_aliases %}
+  <ul>
+    {% for alias in name_aliases %}
+    <li>
+      {{ alias.alias }}
+      <form method="post" action="{{ url_for('profile.delete_name_alias', alias_id=alias.id) }}" class="inline-form">
+        <button type="submit" class="btn btn-small btn-danger">Remove</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form method="post" action="{{ url_for('profile.add_name_alias') }}" class="form-card">
+    <label>New alias
+      <input type="text" name="alias" placeholder="e.g. Chris Smith" required>
+    </label>
+    <button type="submit" class="btn btn-primary">Add alias</button>
+  </form>
+
+  <h3>Membership numbers</h3>
+  {% if memberships %}
+  <ul>
+    {% for m in memberships %}
+    <li>
+      {{ m.organization }}: {{ m.number }}
+      <form method="post" action="{{ url_for('profile.delete_membership', membership_id=m.id) }}" class="inline-form">
+        <button type="submit" class="btn btn-small btn-danger">Remove</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form method="post" action="{{ url_for('profile.add_membership') }}" class="form-card">
+    <label>Organization
+      <input type="text" name="organization" placeholder="e.g. USA Archery" required>
+    </label>
+    <label>Number
+      <input type="text" name="number" required>
+    </label>
+    <button type="submit" class="btn btn-primary">Add membership</button>
+  </form>
+</section>
+
+<section class="section">
+  <h2>Your clubs</h2>
+  <p class="muted">Configure clubs and aliases for Club Coach mode.</p>
+  <a href="{{ url_for('profile.new_club') }}" class="btn btn-primary">Add club</a>
+
+  {% if clubs %}
+  <ul class="club-list">
+    {% for club in clubs %}
+    <li>
+      <a href="{{ url_for('profile.edit_club', club_id=club.id) }}">{{ club.name }}</a>
+      {% if club.is_default %}<span class="badge">Default</span>{% endif %}
+      <span class="muted">{{ club.aliases|length }} alias(es)</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No clubs yet. Add your first club to get started.</p>
+  {% endif %}
+</section>
 {% endblock %}

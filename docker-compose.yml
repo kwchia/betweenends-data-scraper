@@ -1,4 +1,12 @@
 services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   db:
     image: postgres:16-alpine
     environment:
@@ -21,8 +29,28 @@ services:
       DATABASE_URL: postgresql://betweenends:betweenends@db:5432/betweenends
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       FLASK_APP: wsgi:app
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+      ARCHER_SCAN_RECENT_YEARS: ${ARCHER_SCAN_RECENT_YEARS:-3}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: rq worker archer-scans --url redis://redis:6379/0
+    environment:
+      DATABASE_URL: postgresql://betweenends:betweenends@db:5432/betweenends
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      FLASK_APP: wsgi:app
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 volumes:

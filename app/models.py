@@ -12,6 +12,9 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    first_name = db.Column(db.String(128), nullable=True)
+    last_name = db.Column(db.String(128), nullable=True)
+    preferred_mode = db.Column(db.String(20), default="club", nullable=False)
     default_club_id = db.Column(
         db.Integer, db.ForeignKey("clubs.id", use_alter=True), nullable=True
     )
@@ -102,3 +105,92 @@ class SavedTournament(db.Model):
 
     user = db.relationship("User", backref=db.backref("saved_tournaments", cascade="all, delete-orphan"))
     club = db.relationship("Club")
+
+
+class ArcherNameAlias(db.Model):
+    __tablename__ = "archer_name_aliases"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    alias = db.Column(db.String(255), nullable=False)
+
+    user = db.relationship(
+        "User", backref=db.backref("archer_name_aliases", cascade="all, delete-orphan")
+    )
+
+
+class MembershipNumber(db.Model):
+    __tablename__ = "membership_numbers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    organization = db.Column(db.String(128), nullable=False)
+    number = db.Column(db.String(64), nullable=False)
+
+    user = db.relationship(
+        "User", backref=db.backref("membership_numbers", cascade="all, delete-orphan")
+    )
+
+
+class SavedArcherTournament(db.Model):
+    __tablename__ = "saved_archer_tournaments"
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "tournament_id", name="uq_saved_archer_tournament_user"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    tournament_id = db.Column(db.Integer, nullable=False, index=True)
+    tournament_name = db.Column(db.String(512), nullable=False)
+    location = db.Column(db.String(512), nullable=True)
+    start_date = db.Column(db.String(32), nullable=True)
+    end_date = db.Column(db.String(32), nullable=True)
+    match_reason = db.Column(db.String(32), nullable=True)
+    snapshot_json = db.Column(db.JSON, nullable=False)
+    user_metadata = db.Column(db.JSON, nullable=True)
+    saved_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("saved_archer_tournaments", cascade="all, delete-orphan"),
+    )
+
+
+class ArcherScanQueueItem(db.Model):
+    __tablename__ = "archer_scan_queue_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    tournament_id = db.Column(db.Integer, nullable=False, index=True)
+    tournament_name = db.Column(db.String(512), nullable=False)
+    status = db.Column(db.String(20), default="pending", nullable=False)
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("archer_scan_queue_items", cascade="all, delete-orphan"),
+    )
+
+
+class ArcherScanJob(db.Model):
+    __tablename__ = "archer_scan_jobs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    status = db.Column(db.String(20), default="pending", nullable=False)
+    scope = db.Column(db.String(20), default="recent", nullable=False)
+    progress_current = db.Column(db.Integer, default=0, nullable=False)
+    progress_total = db.Column(db.Integer, default=0, nullable=False)
+    tournaments_added = db.Column(db.Integer, default=0, nullable=False)
+    tournaments_skipped = db.Column(db.Integer, default=0, nullable=False)
+    error_message = db.Column(db.Text, nullable=True)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship(
+        "User", backref=db.backref("archer_scan_jobs", cascade="all, delete-orphan")
+    )

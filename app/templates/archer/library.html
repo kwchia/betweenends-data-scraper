@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}My Library — Betweenends Coach{% endblock %}
+{% block content %}
+<h1>My tournament library</h1>
+<p class="muted">Search for a tournament, add it to the scan queue, and keep browsing while results are fetched.</p>
+
+{% if not identity_configured %}
+<p class="flash flash-info">Add your first and last name in <a href="{{ url_for('profile.index') }}">Profile</a> before scanning.</p>
+{% else %}
+
+<section class="form-card" id="archer-search-section">
+  <h2>Find a tournament</h2>
+  <label>Tournament name
+    <input type="text" id="archer-tournament-search" autocomplete="off" placeholder="Start typing tournament name...">
+    <input type="hidden" id="archer-tournament-id">
+    <ul id="archer-search-results" class="search-dropdown"></ul>
+  </label>
+  <div id="archer-selected-tournament" class="selected-tournament"></div>
+  <button type="button" id="archer-queue-btn" class="btn btn-primary" disabled>Add to scan queue</button>
+</section>
+
+<section class="section" id="archer-queue-section">
+  <h2>Scan queue</h2>
+  <ul id="archer-queue-list" class="queue-list">
+    {% for item in queue_items %}
+    <li class="queue-item queue-{{ item.status }}" data-id="{{ item.id }}">
+      {{ item.tournament_name }}
+      <span class="badge">{{ item.status }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p id="archer-queue-empty" class="muted{% if queue_items %} hidden{% endif %}">No tournaments in the queue.</p>
+</section>
+
+{% endif %}
+
+{% if saved %}
+<h2>Saved tournaments</h2>
+<table class="results-table library-table">
+  <thead>
+    <tr>
+      <th>
+        <a href="{{ url_for('archer.library', sort='name', dir='asc' if sort != 'name' or direction == 'desc' else 'desc') }}" class="sort-link{% if sort == 'name' %} active{% endif %}">
+          Tournament{% if sort == 'name' %} {{ '↑' if direction == 'asc' else '↓' }}{% endif %}
+        </a>
+      </th>
+      <th>Matched by</th>
+      <th>
+        <a href="{{ url_for('archer.library', sort='date', dir='asc' if sort != 'date' or direction == 'desc' else 'desc') }}" class="sort-link{% if sort == 'date' %} active{% endif %}">
+          Date{% if sort == 'date' %} {{ '↑' if direction == 'asc' else '↓' }}{% endif %}
+        </a>
+      </th>
+      <th>Saved</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="archer-saved-body">
+    {% for item in saved %}
+    <tr>
+      <td><a href="{{ url_for('archer.library_view', saved_id=item.id) }}">{{ item.tournament_name }}</a></td>
+      <td class="muted">{{ item.match_reason or '—' }}</td>
+      <td>
+        {% if item.start_date %}
+        {{ item.start_date }}{% if item.end_date and item.end_date != item.start_date %} – {{ item.end_date }}{% endif %}
+        {% else %}—{% endif %}
+      </td>
+      <td class="muted">{{ item.saved_at.strftime('%Y-%m-%d') }}</td>
+      <td>
+        <form method="post" action="{{ url_for('archer.library_delete', saved_id=item.id) }}" class="inline-form" onsubmit="return confirm('Remove this tournament?');">
+          <button type="submit" class="btn btn-small btn-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No saved tournaments yet. Search above and add tournaments to the queue.</p>
+{% endif %}
+
+{% if identity_configured %}
+<script>
+  window.ARCHER_SEARCH_URL = {{ url_for('archer.search') | tojson }};
+  window.ARCHER_QUEUE_URL = {{ url_for('archer.queue_add') | tojson }};
+  window.ARCHER_QUEUE_LIST_URL = {{ url_for('archer.queue_list') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/archer_queue.js') }}"></script>
+{% endif %}
+{% endblock %}

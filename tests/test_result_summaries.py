@@ -78,3 +78,44 @@ def test_ranking_single_archer():
     event = _ranking_event()
     assert "1st" in summarize_archer(event, archer)
     assert "590" in summarize_archer(event, archer)
+
+
+def test_semifinal_loss_bronze_match_win():
+    """Lost semifinals but won the bronze-medal match (Finals Round at index 0)."""
+    archer = ArcherResult(
+        name="Recurve College Women Team",
+        club="Club",
+        rank=None,
+        total_score=None,
+        matches=[
+            MatchResult(
+                round_name="Quarter Finals",
+                round_index=2,
+                sides=[
+                    MatchSide("Recurve College Women Team", "Club", 1, "A", [], 6, True),
+                    MatchSide("Other", "X", 2, "B", [], 4, False),
+                ],
+            ),
+            MatchResult(
+                round_name="Semi Finals",
+                round_index=1,
+                sides=[
+                    MatchSide("Recurve College Women Team", "Club", 1, "A", [], 5, False),
+                    MatchSide("Top Seed", "X", 1, "B", [], 6, True),
+                ],
+            ),
+            MatchResult(
+                round_name="Finals Round",
+                round_index=0,
+                sides=[
+                    MatchSide("Recurve College Women Team", "Club", 1, "A", [], 6, True),
+                    MatchSide("Bronze Opponent", "X", 2, "B", [], 4, False),
+                ],
+            ),
+        ],
+    )
+    event = _match_event(divisions=[DivisionResult(name="Recurve College Women", archers=[archer])])
+    text = summarize_archer(event, archer)
+    assert "bronze" in text.lower()
+    assert "3rd" in text
+    assert "eliminated" not in text.lower()

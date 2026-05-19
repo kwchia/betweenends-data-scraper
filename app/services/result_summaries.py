@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.services.event_parsers import ArcherResult, DivisionResult, EventResult, MatchResult, MatchSide
+from app.services.summary import match_bracket_placement
 
 _ROUND_LABELS: dict[str, str] = {
     "Finals Round": "the final",
@@ -106,6 +107,16 @@ def _summarize_match_division(division: DivisionResult) -> str:
 def _summarize_match_path(archer: ArcherResult) -> str:
     if not archer.matches:
         return "No bracket matches recorded."
+
+    place = match_bracket_placement(archer)
+    if place == 1:
+        return "Won the gold-medal match (1st place)."
+    if place == 2:
+        return "Reached the final and finished 2nd (silver)."
+    if place == 3:
+        return "Won the bronze-medal match (3rd place)."
+    if place == 4:
+        return "Lost the bronze-medal match (4th place)."
 
     ordered = sorted(archer.matches, key=lambda m: -m.round_index)
     loss_index = None

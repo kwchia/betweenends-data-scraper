@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Analytics — My Results{% endblock %}
+{% block content %}
+<h1>Analytics</h1>
+<p class="muted">Performance trends from your saved tournaments. Set round distances on tournament pages for distance-based charts.</p>
+
+{% if not has_data %}
+<p class="muted">No saved tournaments yet. <a href="{{ url_for('archer.library') }}">Scan your library</a> first.</p>
+{% else %}
+<nav class="tab-nav analytics-tabs">
+  <button type="button" class="tab-btn active" data-tab="scores">Scores over time</button>
+  <button type="button" class="tab-btn" data-tab="normalized">Normalized</button>
+  <button type="button" class="tab-btn" data-tab="consistency">Consistency</button>
+  <button type="button" class="tab-btn" data-tab="elimination">Eliminations</button>
+</nav>
+
+<div class="tab-panel active" id="tab-scores">
+  <canvas id="chart-scores" height="120"></canvas>
+</div>
+<div class="tab-panel" id="tab-normalized">
+  <canvas id="chart-normalized" height="120"></canvas>
+<div class="tab-panel" id="tab-consistency">
+  <canvas id="chart-consistency" height="120"></canvas>
+</div>
+<div class="tab-panel" id="tab-elimination">
+  <canvas id="chart-elimination" height="120"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+window.__archerChartData = {{ chart_data | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/archer_analytics.js') }}"></script>
+{% endif %}
+{% endblock %}

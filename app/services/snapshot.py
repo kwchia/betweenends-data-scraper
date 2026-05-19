@@ -47,6 +47,9 @@ def _event_from_dict(data: dict) -> EventResult:
         event_type=data["event_type"],
         display_order=data.get("display_order", 0),
         divisions=[_division_from_dict(d) for d in data.get("divisions") or []],
+        arrows_per_end=data.get("arrows_per_end"),
+        ends_per_round=data.get("ends_per_round"),
+        num_rounds=data.get("num_rounds"),
     )
 
 
@@ -67,6 +70,10 @@ def _archer_from_dict(data: dict) -> ArcherResult:
         round_scores=data.get("round_scores") or [],
         matches=[_match_from_dict(m) for m in data.get("matches") or []],
         points=data.get("points"),
+        aid=data.get("aid"),
+        arrow_string=data.get("arrow_string"),
+        round_arrow_strings=data.get("round_arrow_strings") or [],
+        match_reason=data.get("match_reason"),
     )
 
 
@@ -87,6 +94,7 @@ def _match_side_from_dict(data: dict) -> MatchSide:
         end_scores=[EndScore(**e) for e in data.get("end_scores") or []],
         total=data.get("total", 0),
         won=data.get("won", False),
+        arrow_string=data.get("arrow_string"),
     )
 
 
