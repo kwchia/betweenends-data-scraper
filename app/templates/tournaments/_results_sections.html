@@ -2,9 +2,36 @@
     <div class="summary-grid">
       <div class="stat-card">
         <h3>Medals</h3>
-        <p><span class="medal gold">{{ summary.medals.gold }}</span> Gold</p>
-        <p><span class="medal silver">{{ summary.medals.silver }}</span> Silver</p>
-        <p><span class="medal bronze">{{ summary.medals.bronze }}</span> Bronze</p>
+        {% set medal_details = medal_highlights_by_tier(summary) %}
+        {% for tier, label, count in [
+          ('gold', 'Gold', summary.medals.gold),
+          ('silver', 'Silver', summary.medals.silver),
+          ('bronze', 'Bronze', summary.medals.bronze),
+        ] %}
+        {% if count %}
+        {% if pdf_mode %}
+        <p class="medal-stat-line"><span class="medal {{ tier }}">{{ count }}</span> {{ label }}</p>
+        <ul class="medal-detail-list">
+          {% for h in medal_details[tier] %}
+          <li>{{ h.detail }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <details class="collapsible medal-stat-collapse">
+          <summary class="collapsible-summary medal-stat-summary">
+            <span class="medal {{ tier }}">{{ count }}</span> {{ label }}
+          </summary>
+          <ul class="medal-detail-list">
+            {% for h in medal_details[tier] %}
+            <li>{{ h.detail }}</li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% endif %}
+        {% else %}
+        <p class="medal-stat-line"><span class="medal {{ tier }}">0</span> {{ label }}</p>
+        {% endif %}
+        {% endfor %}
       </div>
       <div class="stat-card">
         <h3>Overview</h3>
@@ -26,7 +53,7 @@
     <section class="section">
       <h2>Highlights</h2>
       <ul class="highlights">
-        {% for h in summary.highlights %}
+        {% for h in summary.highlights if h.kind != 'medal' %}
         <li class="highlight-{{ h.kind }}">
           <strong>{{ h.title }}</strong>
           <span class="muted">{{ h.detail }}</span>

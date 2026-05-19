@@ -73,7 +73,11 @@ def build_summary(
                     if archer.rank:
                         key = f"Rank {archer.rank}"
                         summary.finish_histogram[key] = summary.finish_histogram.get(key, 0) + 1
-                    if archer.total_score is not None:
+                    if (
+                        archer.total_score is not None
+                        and archer.rank
+                        and archer.rank <= CUSTOM_POINTS_MEDAL_MAX_RANK
+                    ):
                         summary.highlights.append(
                             Highlight(
                                 kind="top_score",
@@ -139,8 +143,14 @@ def _apply_rank_medals(
         )
     elif rank == 2:
         summary.medals.silver += 1
+        summary.highlights.append(
+            Highlight("medal", f"Silver — {archer_name}", f"{division_name} ({event_name})", event_name)
+        )
     elif rank == 3:
         summary.medals.bronze += 1
+        summary.highlights.append(
+            Highlight("medal", f"Bronze — {archer_name}", f"{division_name} ({event_name})", event_name)
+        )
 
 
 def _apply_bracket_medal(
@@ -157,8 +167,14 @@ def _apply_bracket_medal(
         )
     elif medal == "silver":
         summary.medals.silver += 1
+        summary.highlights.append(
+            Highlight("medal", f"Silver — {archer_name}", f"{division_name} ({event_name})", event_name)
+        )
     elif medal == "bronze":
         summary.medals.bronze += 1
+        summary.highlights.append(
+            Highlight("medal", f"Bronze — {archer_name}", f"{division_name} ({event_name})", event_name)
+        )
 
 
 def _archer_side_in_match(archer_name: str, match: MatchResult) -> MatchSide | None:
@@ -348,6 +364,21 @@ def _parse_set_points(display: str) -> int:
         return int(display) if display else 0
     except ValueError:
         return 0
+
+
+def medal_highlights_by_tier(summary: TournamentSummary) -> dict[str, list[Highlight]]:
+    """Medal highlights grouped for the summary tab (gold / silver / bronze)."""
+    tiers: dict[str, list[Highlight]] = {"gold": [], "silver": [], "bronze": []}
+    for highlight in summary.highlights:
+        if highlight.kind != "medal":
+            continue
+        if highlight.title.startswith("Gold"):
+            tiers["gold"].append(highlight)
+        elif highlight.title.startswith("Silver"):
+            tiers["silver"].append(highlight)
+        elif highlight.title.startswith("Bronze"):
+            tiers["bronze"].append(highlight)
+    return tiers
 
 
 def _dedupe_highlights(highlights: list[Highlight]) -> list[Highlight]:

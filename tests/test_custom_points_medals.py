@@ -1,3 +1,4 @@
+from app.services.club_filter import AliasRule
 from app.services.event_parsers import ArcherIdentity, parse_event
 from app.services.event_parsers import ArcherResult, DivisionResult, EventResult
 from app.services.summary import build_summary
@@ -86,6 +87,44 @@ def test_overall_team_championship_uses_final_row_only():
     summary = build_summary([result])
     assert summary.medals.gold == 1
     assert summary.medals.bronze == 0
+
+
+def test_club_overall_team_championship_uses_final_row_only():
+    """Club results must use cumulative overall standings, not per-discipline rows."""
+    event_data = {
+        "id": 6464,
+        "event_name": "Overall Team Championship Points",
+        "etp": "CustomPointsEvent",
+        "archers": {
+            "1": {"fname": "University of California, San Diego\n[Archer A]", "lname": ""},
+            "2": {"fname": "Other Team\n[Archer B]", "lname": ""},
+        },
+        "data": [
+            [
+                {"nm": "Barebow", "scores": {"1": {"points": 50}, "2": {"points": 40}}},
+                {"nm": "Overall", "scores": {"1": {"points": 80}, "2": {"points": 200}}},
+            ]
+        ],
+    }
+    aliases = [AliasRule("San Diego", "contains")]
+    result = parse_event(
+        {
+            "id": 6464,
+            "event_name": "Overall Team Championship Points",
+            "event_type": "CustomPointsEvent",
+            "display_order": 2,
+        },
+        event_data,
+        None,
+        aliases,
+    )
+    assert len(result.divisions) == 1
+    assert result.divisions[0].name == "Overall"
+    ucsd = result.divisions[0].archers[0]
+    assert ucsd.rank == 2
+    summary = build_summary([result])
+    assert summary.medals.gold == 0
+    assert summary.medals.silver == 1
 
 
 def test_custom_points_rank_11_no_medal():

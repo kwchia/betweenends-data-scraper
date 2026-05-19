@@ -120,6 +120,18 @@ input[type="text"], input[type="email"], input[type="password"], select, textare
 .medal.silver { color: var(--silver); }
 .medal.bronze { color: var(--bronze); }
 
+.medal-stat-collapse { margin-bottom: 0.35rem; border: none; background: transparent; }
+.medal-stat-summary { padding: 0.35rem 0.5rem 0.35rem 1.25rem; font-weight: 600; }
+.medal-stat-line { margin: 0.35rem 0; }
+.medal-detail-list {
+  list-style: none;
+  margin: 0 0 0.5rem 1.25rem;
+  padding: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.medal-detail-list li { padding: 0.2rem 0; }
+
 .results-table { width: 100%; border-collapse: collapse; background: var(--card); }
 .results-table th, .results-table td {
   border: 1px solid var(--border);

@@ -19,6 +19,14 @@ _MEDAL_EVENT_PATTERNS = (
     re.compile(r"championship\s+points", re.I),
 )
 
+# Row labels that denote cumulative overall standings (not per-discipline components).
+_OVERALL_ROW_PATTERNS = (
+    re.compile(r"^overall\b", re.I),
+    re.compile(r"overall\s+(team\s+)?(championship|standing)", re.I),
+    re.compile(r"total\s+points?", re.I),
+    re.compile(r"grand\s+total", re.I),
+)
+
 CUSTOM_POINTS_MEDAL_MAX_RANK = 10
 
 
@@ -41,6 +49,10 @@ def custom_points_counts_for_medals(rank: int | None) -> bool:
     return rank <= 3
 
 
+def _row_label(row: dict) -> str:
+    return row.get("nm") or row.get("name") or row.get("label") or ""
+
+
 def overall_standings_rows(rows: list[dict]) -> list[dict]:
     """Keep only the cumulative overall row(s), not per-discipline point components."""
     scored = [r for r in rows if r and r.get("scores")]
@@ -48,4 +60,8 @@ def overall_standings_rows(rows: list[dict]) -> list[dict]:
         return []
     if len(scored) == 1:
         return scored
+    for row in scored:
+        label = _row_label(row)
+        if label and any(p.search(label) for p in _OVERALL_ROW_PATTERNS):
+            return [row]
     return [scored[-1]]

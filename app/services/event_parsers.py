@@ -396,12 +396,12 @@ def _parse_custom_points(
     if archer_identity and is_award_custom_points_event(default_event_name):
         return []
 
-    archer_medal_event = archer_identity and is_medal_custom_points_event(default_event_name)
+    medal_standings_event = is_medal_custom_points_event(default_event_name)
 
     for block in event_data.get("data") or []:
         block_rows = list(block or [])
         rows_to_parse = (
-            overall_standings_rows(block_rows) if archer_medal_event else block_rows
+            overall_standings_rows(block_rows) if medal_standings_event else block_rows
         )
         for row in rows_to_parse:
             scores = row.get("scores") or {}
@@ -409,7 +409,7 @@ def _parse_custom_points(
                 continue
             row_label = row.get("nm") or row.get("name") or row.get("label")
             division_name = row_label or default_event_name
-            if archer_medal_event and not row_label:
+            if medal_standings_event and not row_label:
                 division_name = default_event_name
 
             rank_by_aid = {

@@ -53,6 +53,21 @@ def test_unique_archers_multiple_divisions_same_event():
     assert count_unique_archers(events) == 1
 
 
+def test_ranking_highlights_only_top_ten_finishes():
+    events = [
+        _ranking_event(
+            [
+                ArcherResult(name="Top Finisher", club="Club", rank=10, total_score=600),
+                ArcherResult(name="Just Missed", club="Club", rank=11, total_score=590),
+                ArcherResult(name="Mid Pack", club="Club", rank=25, total_score=550),
+            ]
+        )
+    ]
+    highlights = build_summary(events).highlights
+    assert len(highlights) == 1
+    assert highlights[0].title.startswith("Top Finisher")
+
+
 def test_unique_archers_counts_distinct_people():
     events = [
         _ranking_event(

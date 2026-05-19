@@ -30,12 +30,14 @@ def create_app(config_class=Config):
     from app.mode import get_app_mode
     from app.services import result_summaries
     from app.services.archer_metadata import get_round_metadata
+    from app.services.summary import medal_highlights_by_tier
 
     app.jinja_env.globals.update(
         division_summary=result_summaries.summarize_division,
         archer_summary=result_summaries.summarize_archer,
         match_summary=result_summaries.summarize_match,
         round_metadata=get_round_metadata,
+        medal_highlights_by_tier=medal_highlights_by_tier,
     )
 
     @app.context_processor
