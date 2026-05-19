@@ -10,7 +10,13 @@ from app.services.event_parsers import (
     MatchResult,
     MatchSide,
 )
-from app.services.summary import Highlight, MedalCounts, TournamentSummary, count_unique_archers
+from app.services.summary import (
+    Highlight,
+    MedalCounts,
+    TournamentSummary,
+    collect_club_roster,
+    unique_archer_names,
+)
 
 
 def build_snapshot(
@@ -32,11 +38,17 @@ def build_snapshot(
     }
 
 
-def load_snapshot(data: dict) -> tuple[dict, list[EventResult], TournamentSummary]:
+def load_snapshot(
+    data: dict, *, club_roster: bool = False
+) -> tuple[dict, list[EventResult], TournamentSummary]:
     tournament = data.get("tournament") or {}
     events = [_event_from_dict(e) for e in data.get("events") or []]
     summary = _summary_from_dict(data.get("summary") or {})
-    summary.total_archers = count_unique_archers(events)
+    if club_roster:
+        summary.roster = collect_club_roster(events)
+    else:
+        summary.roster = unique_archer_names(events)
+    summary.total_archers = len(summary.roster)
     return tournament, events, summary
 
 
@@ -108,6 +120,7 @@ def _summary_from_dict(data: dict) -> TournamentSummary:
         ),
         finish_histogram=data.get("finish_histogram") or {},
         highlights=[Highlight(**h) for h in data.get("highlights") or []],
+        roster=list(data.get("roster") or []),
         total_archers=data.get("total_archers", 0),
         total_events_with_results=data.get("total_events_with_results", 0),
     )

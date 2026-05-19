@@ -34,8 +34,30 @@
         {% endfor %}
       </div>
       <div class="stat-card">
-        <h3>Overview</h3>
-        <p>{{ summary.total_archers }} archer(s) across {{ summary.total_events_with_results }} event(s)</p>
+        <h3>Roster</h3>
+        {% if summary.total_archers %}
+        {% if pdf_mode %}
+        <p class="medal-stat-line">{{ summary.total_archers }} archer(s) across {{ summary.total_events_with_results }} event(s)</p>
+        <ul class="medal-detail-list">
+          {% for name in summary.roster %}
+          <li>{{ name }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <details class="collapsible medal-stat-collapse">
+          <summary class="collapsible-summary medal-stat-summary">
+            {{ summary.total_archers }} archer(s) across {{ summary.total_events_with_results }} event(s)
+          </summary>
+          <ul class="medal-detail-list">
+            {% for name in summary.roster %}
+            <li>{{ name }}</li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% endif %}
+        {% else %}
+        <p class="medal-stat-line">0 archers across {{ summary.total_events_with_results }} event(s)</p>
+        {% endif %}
       </div>
       {% if summary.finish_histogram %}
       <div class="stat-card">

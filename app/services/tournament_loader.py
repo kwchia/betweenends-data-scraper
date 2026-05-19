@@ -36,7 +36,7 @@ def fetch_tournament_results(
         except BetweenendsAPIError:
             continue
 
-    summary = build_summary(parsed_events)
+    summary = build_summary(parsed_events, club_roster=True)
     return tournament, parsed_events, summary
 
 

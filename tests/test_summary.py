@@ -1,5 +1,5 @@
 from app.services.event_parsers import ArcherResult, DivisionResult, EventResult
-from app.services.summary import build_summary, count_unique_archers
+from app.services.summary import build_summary, collect_club_roster, count_unique_archers
 
 
 def _ranking_event(archers: list[ArcherResult]) -> EventResult:
@@ -66,6 +66,50 @@ def test_ranking_highlights_only_top_ten_finishes():
     highlights = build_summary(events).highlights
     assert len(highlights) == 1
     assert highlights[0].title.startswith("Top Finisher")
+
+
+def test_club_roster_dedupes_individuals_and_skips_team_points():
+    events = [
+        _ranking_event(
+            [
+                ArcherResult(name="Alice Smith", club="Club", rank=1, total_score=580),
+                ArcherResult(name="Bob Jones", club="Club", rank=5, total_score=560),
+            ]
+        ),
+        EventResult(
+            event_id=3,
+            event_name="Overall Team Championship Points",
+            event_type="CustomPointsEvent",
+            display_order=3,
+            divisions=[
+                DivisionResult(
+                    name="Overall",
+                    archers=[
+                        ArcherResult(
+                            name="University of California, San Diego",
+                            club="University of California, San Diego",
+                            rank=11,
+                            total_score=None,
+                            points=80.0,
+                        )
+                    ],
+                )
+            ],
+        ),
+        _match_event(
+            [
+                ArcherResult(
+                    name="University of California, San Diego [Alice Smith & Bob Jones]",
+                    club="Club",
+                    rank=1,
+                    total_score=None,
+                )
+            ]
+        ),
+    ]
+    summary = build_summary(events, club_roster=True)
+    assert summary.total_archers == 2
+    assert summary.roster == ["Alice Smith", "Bob Jones"]
 
 
 def test_unique_archers_counts_distinct_people():

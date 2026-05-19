@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass, field
 
+from app.services.club_filter import roster_members_from_display_name
 from app.services.custom_points import (
     CUSTOM_POINTS_MEDAL_MAX_RANK,
     custom_points_counts_for_medals,
@@ -32,6 +33,7 @@ class TournamentSummary:
     medals: MedalCounts = field(default_factory=MedalCounts)
     finish_histogram: dict[str, int] = field(default_factory=dict)
     highlights: list[Highlight] = field(default_factory=list)
+    roster: list[str] = field(default_factory=list)
     total_archers: int = 0
     total_events_with_results: int = 0
 
@@ -43,19 +45,48 @@ def _archer_identity(name: str) -> str:
     return normalized.casefold()
 
 
-def count_unique_archers(events: list[EventResult]) -> int:
-    seen: set[str] = set()
+def unique_archer_names(events: list[EventResult]) -> list[str]:
+    seen: dict[str, str] = {}
     for event in events:
         for division in event.divisions:
             for archer in division.archers:
-                seen.add(_archer_identity(archer.name))
-    return len(seen)
+                key = _archer_identity(archer.name)
+                if key and key not in seen:
+                    seen[key] = _roster_display_name(archer.name)
+    return sorted(seen.values(), key=str.casefold)
+
+
+def count_unique_archers(events: list[EventResult]) -> int:
+    return len(unique_archer_names(events))
+
+
+def _roster_display_name(name: str) -> str:
+    return _MATCH_RANK_SUFFIX.sub("", name).strip()
+
+
+def collect_club_roster(events: list[EventResult]) -> list[str]:
+    """Unique individual archers for a club (excludes team-points rows)."""
+    seen: dict[str, str] = {}
+    for event in events:
+        if event.event_type == "CustomPointsEvent":
+            continue
+        for division in event.divisions:
+            for archer in division.archers:
+                members = roster_members_from_display_name(archer.name)
+                if not members:
+                    members = [_roster_display_name(archer.name)]
+                for member in members:
+                    key = _archer_identity(member)
+                    if key and key not in seen:
+                        seen[key] = _roster_display_name(member)
+    return sorted(seen.values(), key=str.casefold)
 
 
 def build_summary(
     events: list[EventResult],
     *,
     count_bracket_medals: bool = True,
+    club_roster: bool = False,
 ) -> TournamentSummary:
     summary = TournamentSummary()
     bracket_medals_applied: set[tuple[str, str, str]] = set()
@@ -123,7 +154,11 @@ def build_summary(
         if has_results:
             summary.total_events_with_results += 1
 
-    summary.total_archers = count_unique_archers(events)
+    if club_roster:
+        summary.roster = collect_club_roster(events)
+    else:
+        summary.roster = unique_archer_names(events)
+    summary.total_archers = len(summary.roster)
     summary.highlights = _dedupe_highlights(summary.highlights)
     summary.highlights.sort(key=lambda h: (h.kind != "comeback", h.kind != "close_match", h.title))
     return summary

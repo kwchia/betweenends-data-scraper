@@ -108,7 +108,7 @@ def save():
 @login_required
 def view(saved_id: int):
     saved = _get_saved(saved_id)
-    tournament, events, summary = load_snapshot(saved.snapshot_json)
+    tournament, events, summary = load_snapshot(saved.snapshot_json, club_roster=True)
     return render_template(
         "library/view.html",
         saved=saved,
@@ -133,7 +133,7 @@ def delete(saved_id: int):
 @login_required
 def pdf(saved_id: int):
     saved = _get_saved(saved_id)
-    tournament, events, summary = load_snapshot(saved.snapshot_json)
+    tournament, events, summary = load_snapshot(saved.snapshot_json, club_roster=True)
     return pdf_response(
         tournament=tournament,
         club_name=saved.club_name,

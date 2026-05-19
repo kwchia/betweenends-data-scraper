@@ -31,6 +31,23 @@ def extract_team_name(fnm: str) -> str:
     return fnm.split("\n", 1)[0].strip()
 
 
+def roster_members_from_display_name(name: str) -> list[str]:
+    """Individual names embedded in a team display string (match or roster field)."""
+    if not name:
+        return []
+    if "\n[" in name:
+        roster = name.split("\n[", 1)[1].rstrip("]").strip()
+    else:
+        bracket = re.search(r"\[(.+)\]$", name)
+        if not bracket:
+            return []
+        roster = bracket.group(1).strip()
+    if not roster:
+        return []
+    parts = re.split(r"\s*[,&]\s*", roster)
+    return [part.strip() for part in parts if part.strip()]
+
+
 def matches_club(
     club_text: str,
     aliases: Iterable[AliasRule],
