@@ -3,10 +3,20 @@ from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.mode import MODE_ARCHER, MODE_CLUB, is_archer_mode, set_app_mode
-from app.models import ArcherScanQueueItem, SavedArcherTournament
-from app.services.archer_analytics import analytics_to_chart_data, build_analytics
+from app.models import ArcherScanQueueItem, SavedArcherPractice, SavedArcherTournament
+from app.services.archer_analytics import (
+    analytics_has_data,
+    analytics_to_chart_data,
+    build_analytics,
+)
 from app.services.archer_filter import identity_from_user
 from app.services.archer_metadata import update_round_metadata
+from app.services.archer_practice import (
+    PracticeValidationError,
+    practice_round_count,
+    rounds_from_form,
+    validate_rounds,
+)
 from app.services.archer_queue import add_tournament_to_queue, queue_item_to_dict
 from app.services.betweenends_client import BetweenendsAPIError, BetweenendsClient
 from app.services.snapshot import load_snapshot
@@ -33,6 +43,12 @@ def _require_archer_mode():
 def _get_saved(saved_id: int) -> SavedArcherTournament:
     return SavedArcherTournament.query.filter_by(
         id=saved_id, user_id=current_user.id
+    ).first_or_404()
+
+
+def _get_practice(practice_id: int) -> SavedArcherPractice:
+    return SavedArcherPractice.query.filter_by(
+        id=practice_id, user_id=current_user.id
     ).first_or_404()
 
 
@@ -67,6 +83,18 @@ def library():
         .all()
     )
 
+    practices = (
+        SavedArcherPractice.query.filter_by(user_id=current_user.id)
+        .order_by(SavedArcherPractice.practice_date.desc())
+        .all()
+    )
+    edit_id = request.args.get("edit", type=int)
+    edit_practice = None
+    if edit_id:
+        edit_practice = SavedArcherPractice.query.filter_by(
+            id=edit_id, user_id=current_user.id
+        ).first()
+
     return render_template(
         "archer/library.html",
         saved=saved,
@@ -74,6 +102,9 @@ def library():
         direction=direction,
         identity_configured=identity.is_configured(),
         queue_items=queue_items,
+        practices=practices,
+        edit_practice=edit_practice,
+        practice_round_count=practice_round_count,
     )
 
 
@@ -130,6 +161,71 @@ def library_delete(saved_id: int):
     db.session.commit()
     flash("Removed from your library.", "success")
     return redirect(url_for("archer.library"))
+
+
+@archer_bp.route("/practice", methods=["POST"])
+@login_required
+def practice_create():
+    _require_archer_mode()
+    name = (request.form.get("name") or "").strip()
+    practice_date = (request.form.get("practice_date") or "").strip()
+    if not name or not practice_date:
+        flash("Practice name and date are required.", "error")
+        return redirect(url_for("archer.library") + "#archer-practice-section")
+
+    try:
+        rounds = validate_rounds(rounds_from_form(request.form))
+    except PracticeValidationError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("archer.library") + "#archer-practice-section")
+
+    practice = SavedArcherPractice(
+        user_id=current_user.id,
+        name=name,
+        practice_date=practice_date,
+        include_in_analytics=True,
+        rounds_json=rounds,
+    )
+    db.session.add(practice)
+    db.session.commit()
+    flash("Practice session saved.", "success")
+    return redirect(url_for("archer.library") + "#archer-practice-section")
+
+
+@archer_bp.route("/practice/<int:practice_id>", methods=["POST"])
+@login_required
+def practice_update(practice_id: int):
+    _require_archer_mode()
+    practice = _get_practice(practice_id)
+    name = (request.form.get("name") or "").strip()
+    practice_date = (request.form.get("practice_date") or "").strip()
+    if not name or not practice_date:
+        flash("Practice name and date are required.", "error")
+        return redirect(url_for("archer.library", edit=practice_id) + "#archer-practice-section")
+
+    try:
+        rounds = validate_rounds(rounds_from_form(request.form))
+    except PracticeValidationError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("archer.library", edit=practice_id) + "#archer-practice-section")
+
+    practice.name = name
+    practice.practice_date = practice_date
+    practice.rounds_json = rounds
+    db.session.commit()
+    flash("Practice session updated.", "success")
+    return redirect(url_for("archer.library") + "#archer-practice-section")
+
+
+@archer_bp.route("/practice/<int:practice_id>/delete", methods=["POST"])
+@login_required
+def practice_delete(practice_id: int):
+    _require_archer_mode()
+    practice = _get_practice(practice_id)
+    db.session.delete(practice)
+    db.session.commit()
+    flash("Practice session removed.", "success")
+    return redirect(url_for("archer.library") + "#archer-practice-section")
 
 
 @archer_bp.route("/search")
@@ -198,18 +294,37 @@ def queue_list():
 @login_required
 def analytics():
     _require_archer_mode()
+    include_practice = request.args.get("include_practice", "1") != "0"
     saved = (
         SavedArcherTournament.query.filter_by(user_id=current_user.id)
         .order_by(SavedArcherTournament.start_date.asc())
         .all()
     )
-    if not saved:
-        return render_template("archer/analytics.html", chart_data=None, has_data=False)
+    practices = (
+        SavedArcherPractice.query.filter_by(user_id=current_user.id)
+        .order_by(SavedArcherPractice.practice_date.asc())
+        .all()
+        if include_practice
+        else []
+    )
+    if not saved and not practices:
+        return render_template(
+            "archer/analytics.html",
+            chart_data=None,
+            has_data=False,
+            include_practice=include_practice,
+        )
 
-    analytics_result = build_analytics(saved)
+    analytics_result = build_analytics(
+        saved, practices=practices, include_practice=include_practice
+    )
     chart_data = analytics_to_chart_data(analytics_result)
     return render_template(
         "archer/analytics.html",
         chart_data=chart_data,
-        has_data=True,
+        has_data=analytics_has_data(analytics_result),
+        include_practice=include_practice,
+        has_scores=bool(analytics_result.scores_by_distance or analytics_result.normalized_scores),
+        has_consistency=bool(analytics_result.consistency),
+        has_elimination=bool(analytics_result.elimination),
     )

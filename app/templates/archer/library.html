@@ -78,6 +78,79 @@
 <p class="muted">No saved tournaments yet. Search above and add tournaments to the queue.</p>
 {% endif %}
 
+<section class="section" id="archer-practice-section">
+  <h2>Practice sessions</h2>
+  <p class="muted">Log practice rounds manually. Use individual arrows for consistency analytics, or enter a round total only.</p>
+
+  <div class="form-card" id="practice-form-card">
+    <h3>{% if edit_practice %}Edit practice{% else %}Add practice{% endif %}</h3>
+    <form method="post"
+          action="{% if edit_practice %}{{ url_for('archer.practice_update', practice_id=edit_practice.id) }}{% else %}{{ url_for('archer.practice_create') }}{% endif %}"
+          id="practice-form">
+      <div class="practice-header-row">
+        <label class="practice-name-field">Practice name
+          <input type="text" name="name" required maxlength="512" id="practice-name-input"
+                 value="{{ edit_practice.name if edit_practice else '' }}"
+                 placeholder="e.g. Tuesday indoor">
+        </label>
+        <label class="practice-date-field">Date
+          <input type="date" name="practice_date" required id="practice-date-input"
+                 value="{{ edit_practice.practice_date if edit_practice else '' }}">
+        </label>
+      </div>
+      <div id="practice-score-summary" class="practice-score-summary muted" aria-live="polite">
+        Enter scores below to see round totals.
+      </div>
+
+      <div id="practice-rounds">
+        {% set rounds = edit_practice.rounds_json if edit_practice else [{'round_index': 0, 'distance': '', 'conditions': '', 'entry_mode': 'total', 'total_score': None, 'arrow_string': '', 'arrows_per_end': 3, 'num_ends': 1}] %}
+        {% for rnd in rounds %}
+        {% set round = rnd %}
+        {% set idx = loop.index0 %}
+        {% include "archer/_practice_round.html" %}
+        {% endfor %}
+      </div>
+      <button type="button" id="practice-add-round" class="btn btn-small">Add round</button>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{% if edit_practice %}Save changes{% else %}Save practice{% endif %}</button>
+        {% if edit_practice %}
+        <a href="{{ url_for('archer.library') }}#archer-practice-section" class="btn">Cancel</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% if practices %}
+  <table class="results-table library-table">
+    <thead>
+      <tr>
+        <th>Practice</th>
+        <th>Date</th>
+        <th>Rounds</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in practices %}
+      <tr>
+        <td><a href="{{ url_for('archer.library', edit=p.id) }}#archer-practice-section">{{ p.name }}</a></td>
+        <td>{{ p.practice_date }}</td>
+        <td>{{ practice_round_count(p) }}</td>
+        <td>
+          <form method="post" action="{{ url_for('archer.practice_delete', practice_id=p.id) }}" class="inline-form"
+                onsubmit="return confirm('Remove this practice session?');">
+            <button type="submit" class="btn btn-small btn-danger">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No practice sessions yet.</p>
+  {% endif %}
+</section>
+
 {% if identity_configured %}
 <script>
   window.ARCHER_SEARCH_URL = {{ url_for('archer.search') | tojson }};
@@ -86,4 +159,5 @@
 </script>
 <script src="{{ url_for('static', filename='js/archer_queue.js') }}"></script>
 {% endif %}
+<script src="{{ url_for('static', filename='js/archer_practice.js') }}"></script>
 {% endblock %}

@@ -1,0 +1,83 @@
+{# round: dict, idx: int #}
+{% set ape = round.arrows_per_end or 3 %}
+{% set num_ends = round.num_ends or ((round.arrow_string|length // ape) if round.arrow_string else 1) %}
+{% if num_ends < 1 %}{% set num_ends = 1 %}{% endif %}
+<fieldset class="practice-round" data-round-index="{{ idx }}">
+  <legend>Round {{ idx + 1 }}</legend>
+  <input type="hidden" name="round_index_{{ idx }}" value="{{ idx }}">
+  <input type="hidden" name="arrow_string_{{ idx }}" class="arrow-string-hidden" value="{{ round.arrow_string or '' }}">
+  <div class="metadata-row">
+    <label class="metadata-field">
+      <span class="metadata-label">Dist.</span>
+      <input type="text" name="distance_{{ idx }}" maxlength="12" placeholder="18m"
+             value="{{ round.distance or '' }}">
+    </label>
+    <label class="metadata-field">
+      <span class="metadata-label">Cond.</span>
+      <input type="text" name="conditions_{{ idx }}" maxlength="24" placeholder="indoor"
+             value="{{ round.conditions or '' }}">
+    </label>
+  </div>
+  <div class="practice-entry-mode">
+    <label><input type="radio" name="entry_mode_{{ idx }}" value="total"
+      {% if round.entry_mode != 'arrows' %}checked{% endif %} class="entry-mode-radio"> Round total</label>
+    <label><input type="radio" name="entry_mode_{{ idx }}" value="arrows"
+      {% if round.entry_mode == 'arrows' %}checked{% endif %} class="entry-mode-radio"> Individual arrows</label>
+  </div>
+  <div class="practice-total-panel" {% if round.entry_mode == 'arrows' %}hidden{% endif %}>
+    <label class="practice-total-field">Round total
+      <input type="number" name="total_score_{{ idx }}" min="0" class="round-total-input"
+             value="{{ round.total_score if round.total_score is not none else '' }}">
+    </label>
+  </div>
+  <div class="practice-arrows-panel" {% if round.entry_mode != 'arrows' %}hidden{% endif %}>
+    <div class="practice-arrows-config">
+      <label>Arrows per end
+        <input type="number" name="arrows_per_end_{{ idx }}" min="1" max="12" class="arrows-per-end-input"
+               value="{{ ape }}">
+      </label>
+      <label>Number of ends
+        <input type="number" name="num_ends_{{ idx }}" min="1" max="50" class="num-ends-input"
+               value="{{ num_ends }}">
+      </label>
+      <button type="button" class="btn btn-small practice-build-grid">Update scorecard</button>
+    </div>
+    <div class="practice-arrow-grid-wrap">
+      <table class="practice-arrow-grid">
+        <thead>
+          <tr>
+            <th>End</th>
+            {% for a in range(ape) %}
+            <th>Arrow {{ a + 1 }}</th>
+            {% endfor %}
+            <th>End total</th>
+            <th>Running</th>
+          </tr>
+        </thead>
+        <tbody class="practice-arrow-grid-body">
+          {% for e in range(num_ends) %}
+          <tr data-end="{{ e }}">
+            <td>{{ e + 1 }}</td>
+            {% for a in range(ape) %}
+            {% set pos = e * ape + a %}
+            {% set ch = round.arrow_string[pos] if round.arrow_string and pos < round.arrow_string|length else '' %}
+            <td><input type="text" name="arrow_{{ idx }}_{{ e }}_{{ a }}" maxlength="2"
+                       class="arrow-cell-input" value="{{ ch }}" placeholder="—"></td>
+            {% endfor %}
+            <td class="end-total-cell">—</td>
+            <td class="running-total-cell">—</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="{{ ape + 1 }}"><strong>Round total</strong></td>
+            <td colspan="2" class="round-grid-total">—</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <p class="muted small">Enter one character per arrow (X, T, 9–0, etc.).</p>
+  </div>
+  <button type="button" class="btn btn-small btn-danger practice-remove-round">Remove round</button>
+</fieldset>

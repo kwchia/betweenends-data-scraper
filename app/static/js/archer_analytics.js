@@ -11,17 +11,26 @@
     "#00838f",
   ];
 
-  function makeLineChart(canvasId, labels, datasets, yLabel) {
+  function makeLineChart(canvasId, labels, datasets, yLabel, dualAxis) {
     const el = document.getElementById(canvasId);
     if (!el) return;
+    const scales = {
+      y: { title: { display: !!yLabel, text: yLabel || "" }, position: "left" },
+    };
+    if (dualAxis) {
+      scales.y1 = {
+        type: "linear",
+        position: "right",
+        title: { display: true, text: "Flier rate %" },
+        grid: { drawOnChartArea: false },
+      };
+    }
     new Chart(el, {
       type: "line",
       data: { labels, datasets },
       options: {
         responsive: true,
-        scales: {
-          y: { title: { display: !!yLabel, text: yLabel || "" } },
-        },
+        scales,
       },
     });
   }
@@ -77,7 +86,8 @@
           yAxisID: "y1",
         },
       ],
-      "Spread"
+      "Spread",
+      true
     );
   }
 
@@ -105,11 +115,46 @@
         options: { responsive: true },
       });
     }
+    const tbody = document.getElementById("elim-seed-body");
+    if (tbody && elim.details) {
+      elim.details.forEach((row, i) => {
+        const vsH = elim.vs_higher[i] || { wins: 0, total: 0 };
+        const vsL = elim.vs_lower[i] || { wins: 0, total: 0 };
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          escapeHtml(row.round_name) +
+          "</td><td>" +
+          escapeHtml(row.event_name) +
+          "</td><td>" +
+          row.wins +
+          "–" +
+          row.losses +
+          "</td><td>" +
+          vsH.wins +
+          "/" +
+          vsH.total +
+          "</td><td>" +
+          vsL.wins +
+          "/" +
+          vsL.total +
+          "</td>";
+        tbody.appendChild(tr);
+      });
+    }
+  }
+
+  function escapeHtml(text) {
+    const d = document.createElement("div");
+    d.textContent = text || "";
+    return d.innerHTML;
   }
 
   document.querySelectorAll(".analytics-tabs .tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".analytics-tabs .tab-btn").forEach((b) => b.classList.remove("active"));
+      document
+        .querySelectorAll(".analytics-tabs .tab-btn")
+        .forEach((b) => b.classList.remove("active"));
       document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
       const panel = document.getElementById("tab-" + btn.dataset.tab);

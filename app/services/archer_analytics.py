@@ -35,6 +35,8 @@ class ConsistencyPoint:
 class EliminationStats:
     round_name: str
     round_index: int
+    event_name: str
+    tournament_name: str
     wins: int
     losses: int
     win_rate: float
@@ -87,6 +89,30 @@ def _normalized_score(score: int, arrow_count: int) -> float:
     return score / (arrow_count * 10)
 
 
+def _append_consistency(
+    analytics: ArcherAnalytics,
+    date: str,
+    tournament_name: str,
+    event_name: str,
+    arrow_string: str,
+    arrows_per_end: int,
+) -> None:
+    ends = _end_values(arrow_string, arrows_per_end)
+    if not ends:
+        return
+    spreads = [_end_spread(e) for e in ends]
+    fliers = sum(_fliers_in_end(e) for e in ends)
+    analytics.consistency.append(
+        ConsistencyPoint(
+            date=date,
+            tournament_name=tournament_name,
+            event_name=event_name,
+            end_spread_avg=mean(spreads),
+            flier_rate=fliers / len(ends),
+        )
+    )
+
+
 def _archer_side_in_match(archer_name: str, match: MatchResult):
     for side in match.sides:
         base = side.name.split(" (")[0].strip()
@@ -102,9 +128,13 @@ def _opponent_side(archer_side, match: MatchResult):
     return None
 
 
-def build_analytics(saved_entries: list) -> ArcherAnalytics:
+def build_analytics(
+    saved_entries: list,
+    practices: Optional[list] = None,
+    include_practice: bool = True,
+) -> ArcherAnalytics:
     analytics = ArcherAnalytics()
-    elim_buckets: dict[int, dict] = {}
+    elim_buckets: dict[tuple[str, int], dict] = {}
 
     for entry in saved_entries:
         tournament, events, _ = load_snapshot(entry.snapshot_json)
@@ -140,12 +170,32 @@ def build_analytics(saved_entries: list) -> ArcherAnalytics:
                         elim_buckets,
                     )
 
-    for rnd_idx, bucket in sorted(elim_buckets.items()):
+    if include_practice and practices:
+        from app.services.archer_practice import practice_arrow_rounds, practice_to_score_points
+
+        for practice in practices:
+            if not practice.include_in_analytics:
+                continue
+            for point in practice_to_score_points(practice):
+                analytics.normalized_scores.append(point)
+                analytics.scores_by_distance.setdefault(point.distance, []).append(point)
+            for date, name, arrow_string, ape in practice_arrow_rounds(practice):
+                _append_consistency(
+                    analytics, date, name, "Practice", arrow_string, ape
+                )
+
+    for bucket_key in sorted(
+        elim_buckets.keys(),
+        key=lambda k: (elim_buckets[k]["tournament_name"], -k[1]),
+    ):
+        bucket = elim_buckets[bucket_key]
         total = bucket["wins"] + bucket["losses"]
         analytics.elimination.append(
             EliminationStats(
                 round_name=bucket["round_name"],
-                round_index=rnd_idx,
+                round_index=bucket_key[1],
+                event_name=bucket["event_name"],
+                tournament_name=bucket["tournament_name"],
                 wins=bucket["wins"],
                 losses=bucket["losses"],
                 win_rate=bucket["wins"] / total if total else 0.0,
@@ -206,20 +256,9 @@ def _process_ranking(
         )
         analytics.normalized_scores.append(point)
         analytics.scores_by_distance.setdefault(distance, []).append(point)
-
-        ends = _end_values(round_arrows, arrows_per_end)
-        if ends:
-            spreads = [_end_spread(e) for e in ends]
-            fliers = sum(_fliers_in_end(e) for e in ends)
-            analytics.consistency.append(
-                ConsistencyPoint(
-                    date=date,
-                    tournament_name=t_name,
-                    event_name=event.event_name,
-                    end_spread_avg=mean(spreads),
-                    flier_rate=fliers / len(ends),
-                )
-            )
+        _append_consistency(
+            analytics, date, t_name, event.event_name, round_arrows, arrows_per_end
+        )
 
 
 def _process_custom_points(
@@ -284,10 +323,12 @@ def _process_matches(
         if not side:
             continue
         opp = _opponent_side(side, match)
-        rnd = match.round_index
-        if rnd not in elim_buckets:
-            elim_buckets[rnd] = {
+        bucket_key = (event_name, match.round_index)
+        if bucket_key not in elim_buckets:
+            elim_buckets[bucket_key] = {
                 "round_name": match.round_name,
+                "event_name": event_name,
+                "tournament_name": t_name,
                 "wins": 0,
                 "losses": 0,
                 "arrow_totals": [],
@@ -296,7 +337,7 @@ def _process_matches(
                 "vs_lower_wins": 0,
                 "vs_lower_total": 0,
             }
-        bucket = elim_buckets[rnd]
+        bucket = elim_buckets[bucket_key]
         if side.won:
             bucket["wins"] += 1
         else:
@@ -316,6 +357,15 @@ def _process_matches(
                     bucket["vs_lower_wins"] += 1
 
 
+def analytics_has_data(analytics: ArcherAnalytics) -> bool:
+    return bool(
+        analytics.scores_by_distance
+        or analytics.normalized_scores
+        or analytics.consistency
+        or analytics.elimination
+    )
+
+
 def analytics_to_chart_data(analytics: ArcherAnalytics) -> dict:
     scores_labels: dict[str, list[str]] = {}
     scores_values: dict[str, list[float]] = {}
@@ -327,6 +377,10 @@ def analytics_to_chart_data(analytics: ArcherAnalytics) -> dict:
         scores_values[distance] = [p.score for p in sorted_pts]
 
     norm_sorted = sorted(analytics.normalized_scores, key=lambda p: p.date)
+    elim_labels = [
+        f"{e.round_name} ({e.event_name[:12]})" if e.event_name else e.round_name
+        for e in analytics.elimination
+    ]
     return {
         "scores_by_distance": {
             "labels": scores_labels,
@@ -337,13 +391,40 @@ def analytics_to_chart_data(analytics: ArcherAnalytics) -> dict:
             "values": [round(p.normalized * 100, 1) for p in norm_sorted],
         },
         "consistency": {
-            "labels": [f"{p.date} {p.event_name[:15]}" for p in analytics.consistency],
+            "labels": [
+                f"{p.date} {p.tournament_name[:12]} {p.event_name[:10]}"
+                for p in analytics.consistency
+            ],
             "spread": [round(p.end_spread_avg, 2) for p in analytics.consistency],
             "fliers": [round(p.flier_rate * 100, 1) for p in analytics.consistency],
         },
         "elimination": {
-            "labels": [e.round_name for e in analytics.elimination],
+            "labels": elim_labels,
             "win_rates": [round(e.win_rate * 100, 1) for e in analytics.elimination],
             "avg_arrows": [round(e.avg_arrows, 1) for e in analytics.elimination],
+            "vs_higher": [
+                {
+                    "wins": e.vs_higher_seed_wins,
+                    "total": e.vs_higher_seed_total,
+                }
+                for e in analytics.elimination
+            ],
+            "vs_lower": [
+                {
+                    "wins": e.vs_lower_seed_wins,
+                    "total": e.vs_lower_seed_total,
+                }
+                for e in analytics.elimination
+            ],
+            "details": [
+                {
+                    "round_name": e.round_name,
+                    "event_name": e.event_name,
+                    "tournament_name": e.tournament_name,
+                    "wins": e.wins,
+                    "losses": e.losses,
+                }
+                for e in analytics.elimination
+            ],
         },
     }

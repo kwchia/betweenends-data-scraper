@@ -175,6 +175,23 @@ class ArcherScanQueueItem(db.Model):
     )
 
 
+class SavedArcherPractice(db.Model):
+    __tablename__ = "saved_archer_practices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    name = db.Column(db.String(512), nullable=False)
+    practice_date = db.Column(db.String(32), nullable=False)
+    include_in_analytics = db.Column(db.Boolean, default=True, nullable=False)
+    rounds_json = db.Column(db.JSON, nullable=False)
+    saved_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("saved_archer_practices", cascade="all, delete-orphan"),
+    )
+
+
 class ArcherScanJob(db.Model):
     __tablename__ = "archer_scan_jobs"
 
