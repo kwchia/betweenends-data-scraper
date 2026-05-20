@@ -120,17 +120,47 @@ input[type="text"], input[type="email"], input[type="password"], select, textare
 .medal.silver { color: var(--silver); }
 .medal.bronze { color: var(--bronze); }
 
-.medal-stat-collapse { margin-bottom: 0.35rem; border: none; background: transparent; }
-.medal-stat-summary { padding: 0.35rem 0.5rem 0.35rem 1.25rem; font-weight: 600; }
-.medal-stat-line { margin: 0.35rem 0; }
-.medal-detail-list {
-  list-style: none;
-  margin: 0 0 0.5rem 1.25rem;
-  padding: 0;
-  font-size: 0.9rem;
-  color: var(--muted);
+.medals-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.medal-collapse { margin: 0; border: none; background: transparent; }
+.medal-collapse > .collapsible-summary { padding: 0.35rem 0.5rem 0.35rem 1.5rem; }
+.medal-collapse > .collapsible-summary::before { top: 0.45rem; left: 0.25rem; }
+.medal-collapse > .collapsible-body { border-top: none; padding: 0 0 0.5rem 1.5rem; }
+.medal-winners { list-style: none; margin: 0; padding: 0; }
+.medal-winners li { padding: 0.35rem 0; font-size: 0.92rem; }
+.medal-winners li strong { display: block; }
+.medal-winners .muted { font-size: 0.88rem; }
+
+.finishes-by-event { display: flex; flex-direction: column; gap: 0.35rem; }
+.finish-event-collapse { margin: 0; border: none; background: transparent; }
+.finish-event-collapse > .collapsible-summary { padding: 0.35rem 0.5rem 0.35rem 1.5rem; }
+.finish-event-collapse > .collapsible-summary::before { top: 0.45rem; left: 0.25rem; }
+.finish-event-collapse > .collapsible-body { border-top: none; padding: 0 0 0.5rem 1.5rem; }
+.finish-event-title { margin: 0.5rem 0 0.25rem; font-size: 0.95rem; }
+.finish-list { margin: 0; padding-left: 1.25rem; font-size: 0.92rem; }
+.finish-list li { padding: 0.15rem 0; }
+
+.roster-table { margin-top: 1rem; }
+.roster-table td:first-child { min-width: 12rem; }
+.roster-section { margin-bottom: 2rem; }
+.roster-section h3 { margin-bottom: 0.5rem; }
+
+.results-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 35, 50, 0.55);
 }
-.medal-detail-list li { padding: 0.2rem 0; }
+.results-loading p {
+  margin: 0;
+  padding: 1.25rem 1.75rem;
+  background: var(--card);
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
 
 .results-table { width: 100%; border-collapse: collapse; background: var(--card); }
 .results-table th, .results-table td {
@@ -153,6 +183,7 @@ input[type="text"], input[type="email"], input[type="password"], select, textare
 .highlights { list-style: none; padding: 0; }
 .highlights li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
 .highlight-comeback strong { color: var(--success); }
+.highlight-top_finish strong { color: var(--accent, #1565c0); }
 
 .club-list { list-style: none; padding: 0; }
 .club-list li { padding: 0.75rem; background: var(--card); border: 1px solid var(--border); margin-bottom: 0.5rem; border-radius: 6px; }

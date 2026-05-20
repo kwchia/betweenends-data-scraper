@@ -107,7 +107,7 @@ def new_club():
             for line in alias_text.splitlines():
                 line = line.strip()
                 if line:
-                    db.session.add(ClubAlias(club_id=club.id, alias=line, match_mode="contains"))
+                    db.session.add(ClubAlias(club_id=club.id, alias=line, match_mode="exact"))
 
             if club.is_default:
                 current_user.default_club_id = club.id
@@ -145,7 +145,7 @@ def edit_club(club_id):
 def add_alias(club_id):
     club = _get_user_club(club_id)
     alias = request.form.get("alias", "").strip()
-    match_mode = request.form.get("match_mode", "contains")
+    match_mode = request.form.get("match_mode", "exact")
     if not alias:
         flash("Alias cannot be empty.", "error")
     elif match_mode not in ("exact", "contains"):

@@ -1,16 +1,19 @@
 import re
 from dataclasses import dataclass, field
 
-from app.services.club_filter import roster_members_from_display_name
-from app.services.custom_points import (
-    CUSTOM_POINTS_MEDAL_MAX_RANK,
-    custom_points_counts_for_medals,
-    is_award_custom_points_event,
-    is_medal_custom_points_event,
-)
+from app.services.club_filter import normalize_for_match, roster_members_from_display_name
 from app.services.event_parsers import ArcherResult, EventResult, MatchResult, MatchSide
 
 _MATCH_RANK_SUFFIX = re.compile(r"\s+\(\d+\)$")
+_INDIVIDUAL_EVENT_TYPES = frozenset({"RankingEvent", "CombinedRankingEvent", "MatchEvent"})
+_RANKING_HIGHLIGHT_MAX_PLACE = 10
+
+
+@dataclass
+class MedalWinner:
+    archer_name: str
+    event_name: str
+    detail: str
 
 
 @dataclass
@@ -18,6 +21,23 @@ class MedalCounts:
     gold: int = 0
     silver: int = 0
     bronze: int = 0
+    gold_winners: list[MedalWinner] = field(default_factory=list)
+    silver_winners: list[MedalWinner] = field(default_factory=list)
+    bronze_winners: list[MedalWinner] = field(default_factory=list)
+
+
+@dataclass
+class RosterEntry:
+    name: str
+    categories: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TeamRosterEntry:
+    event_name: str
+    category: str
+    rank: int | None = None
+    points: float | None = None
 
 
 @dataclass
@@ -31,7 +51,9 @@ class Highlight:
 @dataclass
 class TournamentSummary:
     medals: MedalCounts = field(default_factory=MedalCounts)
-    finish_histogram: dict[str, int] = field(default_factory=dict)
+    finishes_by_event: dict[str, dict[str, int]] = field(default_factory=dict)
+    individual_roster: list[RosterEntry] = field(default_factory=list)
+    team_roster: list[TeamRosterEntry] = field(default_factory=list)
     highlights: list[Highlight] = field(default_factory=list)
     roster: list[str] = field(default_factory=list)
     total_archers: int = 0
@@ -40,16 +62,108 @@ class TournamentSummary:
 
 def _archer_identity(name: str) -> str:
     """Normalize display names so the same person counts once across events."""
+    return _display_name(name).casefold()
+
+
+def _display_name(name: str) -> str:
     normalized = " ".join(name.split())
-    normalized = _MATCH_RANK_SUFFIX.sub("", normalized)
-    return normalized.casefold()
+    return _MATCH_RANK_SUFFIX.sub("", normalized).strip()
+
+
+def _coerce_rank(rank) -> int | None:
+    if rank is None:
+        return None
+    try:
+        return int(rank)
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_custom_points_team_result(archer: ArcherResult) -> bool:
+    name = _display_name(archer.name)
+    if any(marker in name for marker in ("University", "College", " Institute", " School", " Team")):
+        return True
+    if archer.club:
+        club_n = normalize_for_match(archer.club)
+        name_n = normalize_for_match(name)
+        if name_n == club_n or club_n in name_n or name_n in club_n:
+            return True
+    return False
+
+
+def is_team_entry(archer: ArcherResult, event_type: str) -> bool:
+    if event_type == "CustomPointsEvent":
+        return _is_custom_points_team_result(archer)
+    if event_type != "MatchEvent":
+        return False
+    name = archer.name
+    if "\n[" in name or " [" in name:
+        return True
+    if name.endswith(" Team"):
+        return True
+    if archer.club and normalize_for_match(_display_name(name)) == normalize_for_match(archer.club):
+        return True
+    return False
+
+
+def build_individual_roster(events: list[EventResult]) -> list[RosterEntry]:
+    by_identity: dict[str, tuple[str, set[str]]] = {}
+    for event in events:
+        if event.event_type not in _INDIVIDUAL_EVENT_TYPES:
+            continue
+        for division in event.divisions:
+            for archer in division.archers:
+                if is_team_entry(archer, event.event_type):
+                    continue
+                identity = _archer_identity(archer.name)
+                display = _display_name(archer.name)
+                if identity not in by_identity:
+                    by_identity[identity] = (display, set())
+                elif "(" in by_identity[identity][0] and "(" not in display:
+                    by_identity[identity] = (display, by_identity[identity][1])
+                by_identity[identity][1].add(division.name)
+
+    roster = [
+        RosterEntry(name=name, categories=sorted(categories))
+        for name, categories in by_identity.values()
+    ]
+    roster.sort(key=lambda e: ((e.categories[0].lower() if e.categories else ""), e.name.lower()))
+    return roster
+
+
+def build_team_roster(events: list[EventResult]) -> list[TeamRosterEntry]:
+    seen: set[tuple[str, str]] = set()
+    teams: list[TeamRosterEntry] = []
+    for event in events:
+        for division in event.divisions:
+            for archer in division.archers:
+                if not is_team_entry(archer, event.event_type):
+                    continue
+                key = (event.event_name, division.name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                teams.append(
+                    TeamRosterEntry(
+                        event_name=event.event_name,
+                        category=division.name,
+                        rank=_coerce_rank(archer.rank),
+                        points=archer.points,
+                    )
+                )
+    teams.sort(key=lambda t: (t.event_name.lower(), t.category.lower()))
+    return teams
 
 
 def unique_archer_names(events: list[EventResult]) -> list[str]:
     seen: dict[str, str] = {}
     for event in events:
+        if event.event_type not in _INDIVIDUAL_EVENT_TYPES:
+            continue
         for division in event.divisions:
             for archer in division.archers:
+                if is_team_entry(archer, event.event_type):
+                    continue
                 key = _archer_identity(archer.name)
                 if key and key not in seen:
                     seen[key] = _roster_display_name(archer.name)
@@ -57,7 +171,16 @@ def unique_archer_names(events: list[EventResult]) -> list[str]:
 
 
 def count_unique_archers(events: list[EventResult]) -> int:
-    return len(unique_archer_names(events))
+    seen: set[str] = set()
+    for event in events:
+        if event.event_type not in _INDIVIDUAL_EVENT_TYPES:
+            continue
+        for division in event.divisions:
+            for archer in division.archers:
+                if is_team_entry(archer, event.event_type):
+                    continue
+                seen.add(_archer_identity(archer.name))
+    return len(seen)
 
 
 def _roster_display_name(name: str) -> str:
@@ -97,126 +220,124 @@ def build_summary(
             for archer in division.archers:
                 has_results = True
 
-                if event.event_type in ("RankingEvent", "CombinedRankingEvent"):
-                    _apply_rank_medals(
-                        summary, archer.rank, event.event_name, division.name, archer.name
+                if event.event_type in ("RankingEvent", "CombinedRankingEvent", "CustomPointsEvent"):
+                    rank = _coerce_rank(archer.rank)
+                    detail = (
+                        f"{event.event_name}"
+                        if event.event_type == "CustomPointsEvent"
+                        else division.name
                     )
-                    if archer.rank:
-                        key = f"Rank {archer.rank}"
-                        summary.finish_histogram[key] = summary.finish_histogram.get(key, 0) + 1
-                    if (
-                        archer.total_score is not None
-                        and archer.rank
-                        and archer.rank <= CUSTOM_POINTS_MEDAL_MAX_RANK
-                    ):
-                        summary.highlights.append(
-                            Highlight(
-                                kind="top_score",
-                                title=f"{archer.name} — {archer.total_score}",
-                                detail=f"{division.name} in {event.event_name}",
-                                event_name=event.event_name,
-                            )
+                    _apply_rank_medals(summary, rank, event.event_name, detail, archer.name)
+                    if rank:
+                        _record_finish(summary, event.event_name, f"Rank {rank}")
+                    if event.event_type in ("RankingEvent", "CombinedRankingEvent"):
+                        _maybe_add_ranking_highlight(
+                            summary,
+                            archer,
+                            rank,
+                            division.name,
+                            event.event_name,
                         )
-                elif event.event_type == "CustomPointsEvent":
-                    if is_award_custom_points_event(event.event_name):
-                        continue
-                    if not is_medal_custom_points_event(event.event_name):
-                        continue
-                    if custom_points_counts_for_medals(archer.rank):
-                        _apply_rank_medals(
-                            summary, archer.rank, event.event_name, division.name, archer.name
-                        )
-                    if archer.rank and archer.rank <= CUSTOM_POINTS_MEDAL_MAX_RANK:
-                        key = f"Rank {archer.rank}"
-                        summary.finish_histogram[key] = summary.finish_histogram.get(key, 0) + 1
-                        if archer.points is not None:
-                            summary.highlights.append(
-                                Highlight(
-                                    kind="top_score",
-                                    title=f"{archer.name} — {archer.points} pts",
-                                    detail=f"{division.name} in {event.event_name}",
-                                    event_name=event.event_name,
-                                )
-                            )
                 elif event.event_type == "MatchEvent":
-                    if count_bracket_medals:
-                        medal_key = (event.event_name, division.name, _archer_identity(archer.name))
-                        if medal_key not in bracket_medals_applied:
-                            bracket_medals_applied.add(medal_key)
-                            medal = _bracket_medal_for_archer(archer)
-                            if medal:
-                                _apply_bracket_medal(
-                                    summary, medal, event.event_name, division.name, archer.name
-                                )
+                    _apply_match_bracket_medals(
+                        summary, archer, event.event_name, division.name
+                    )
                     for match in archer.matches:
-                        _process_match_highlight(summary, match, event.event_name, archer.name)
+                        _process_match_highlight(
+                            summary,
+                            match,
+                            event.event_name,
+                            division.name,
+                            archer,
+                            event.event_type,
+                        )
 
         if has_results:
             summary.total_events_with_results += 1
 
+    summary.total_archers = count_unique_archers(events)
+    summary.individual_roster = build_individual_roster(events)
+    summary.team_roster = build_team_roster(events)
     if club_roster:
         summary.roster = collect_club_roster(events)
     else:
         summary.roster = unique_archer_names(events)
-    summary.total_archers = len(summary.roster)
     summary.highlights = _dedupe_highlights(summary.highlights)
-    summary.highlights.sort(key=lambda h: (h.kind != "comeback", h.kind != "close_match", h.title))
+    summary.highlights.sort(
+        key=lambda h: (
+            h.kind != "medal",
+            h.kind != "top_finish",
+            h.kind != "comeback",
+            h.kind != "close_match",
+            h.title,
+        )
+    )
     return summary
+
+
+def _ordinal(rank: int) -> str:
+    if 10 <= rank % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")
+    return f"{rank}{suffix}"
+
+
+def _maybe_add_ranking_highlight(
+    summary: TournamentSummary,
+    archer: ArcherResult,
+    rank: int | None,
+    division_name: str,
+    event_name: str,
+) -> None:
+    if not rank or rank > _RANKING_HIGHLIGHT_MAX_PLACE:
+        return
+    score_fragment = f" ({archer.total_score} pts)" if archer.total_score is not None else ""
+    summary.highlights.append(
+        Highlight(
+            kind="top_finish",
+            title=f"{archer.name} — {_ordinal(rank)}",
+            detail=f"{division_name} in {event_name}{score_fragment}",
+            event_name=event_name,
+        )
+    )
+
+
+def _record_finish(summary: TournamentSummary, event_name: str, label: str) -> None:
+    event_finishes = summary.finishes_by_event.setdefault(event_name, {})
+    event_finishes[label] = event_finishes.get(label, 0) + 1
+
+
+def _record_medal(
+    summary: TournamentSummary,
+    tier: str,
+    archer_name: str,
+    event_name: str,
+    detail: str,
+) -> None:
+    winner = MedalWinner(archer_name=archer_name, event_name=event_name, detail=detail)
+    winners = getattr(summary.medals, f"{tier}_winners")
+    winners.append(winner)
+    setattr(summary.medals, tier, getattr(summary.medals, tier) + 1)
+    if tier == "gold":
+        summary.highlights.append(
+            Highlight("medal", f"Gold — {archer_name}", f"{detail} ({event_name})", event_name)
+        )
 
 
 def _apply_rank_medals(
     summary: TournamentSummary,
     rank: int | None,
     event_name: str,
-    division_name: str,
+    detail: str,
     archer_name: str,
 ) -> None:
     if rank == 1:
-        summary.medals.gold += 1
-        summary.highlights.append(
-            Highlight("medal", f"Gold — {archer_name}", f"{division_name} ({event_name})", event_name)
-        )
+        _record_medal(summary, "gold", archer_name, event_name, detail)
     elif rank == 2:
-        summary.medals.silver += 1
-        summary.highlights.append(
-            Highlight("medal", f"Silver — {archer_name}", f"{division_name} ({event_name})", event_name)
-        )
+        _record_medal(summary, "silver", archer_name, event_name, detail)
     elif rank == 3:
-        summary.medals.bronze += 1
-        summary.highlights.append(
-            Highlight("medal", f"Bronze — {archer_name}", f"{division_name} ({event_name})", event_name)
-        )
-
-
-def _apply_bracket_medal(
-    summary: TournamentSummary,
-    medal: str,
-    event_name: str,
-    division_name: str,
-    archer_name: str,
-) -> None:
-    if medal == "gold":
-        summary.medals.gold += 1
-        summary.highlights.append(
-            Highlight("medal", f"Gold — {archer_name}", f"{division_name} ({event_name})", event_name)
-        )
-    elif medal == "silver":
-        summary.medals.silver += 1
-        summary.highlights.append(
-            Highlight("medal", f"Silver — {archer_name}", f"{division_name} ({event_name})", event_name)
-        )
-    elif medal == "bronze":
-        summary.medals.bronze += 1
-        summary.highlights.append(
-            Highlight("medal", f"Bronze — {archer_name}", f"{division_name} ({event_name})", event_name)
-        )
-
-
-def _archer_side_in_match(archer_name: str, match: MatchResult) -> MatchSide | None:
-    for side in match.sides:
-        if side.name.startswith(archer_name) or archer_name in side.name:
-            return side
-    return match.sides[0] if match.sides else None
+        _record_medal(summary, "bronze", archer_name, event_name, detail)
 
 
 def _is_finals_stage_round(round_name: str, round_index: int) -> bool:
@@ -229,6 +350,13 @@ def _is_semifinal_round(round_name: str, round_index: int) -> bool:
     if "Semi" in round_name and "quarter" not in round_name.lower():
         return True
     return round_index == 1 and round_name.startswith("Match ")
+
+
+def _archer_side_in_match(match: MatchResult, archer_name: str) -> MatchSide | None:
+    for side in match.sides:
+        if side.name.startswith(archer_name) or archer_name in side.name:
+            return side
+    return match.sides[0] if match.sides else None
 
 
 def match_bracket_placement(archer: ArcherResult) -> int | None:
@@ -251,7 +379,7 @@ def match_bracket_placement(archer: ArcherResult) -> int | None:
         return None
 
     final_match = finals_matches[0]
-    final_side = _archer_side_in_match(archer.name, final_match)
+    final_side = _archer_side_in_match(final_match, archer.name)
     if final_side is None:
         return None
     won_final = final_side.won
@@ -262,7 +390,7 @@ def match_bracket_placement(archer: ArcherResult) -> int | None:
         if _is_semifinal_round(m.round_name, m.round_index)
     ]
     if semi_matches:
-        semi_side = _archer_side_in_match(archer.name, semi_matches[0])
+        semi_side = _archer_side_in_match(semi_matches[0], archer.name)
         won_semi = semi_side.won if semi_side else False
     else:
         won_semi = True
@@ -276,79 +404,51 @@ def match_bracket_placement(archer: ArcherResult) -> int | None:
     return 4
 
 
-def _bracket_round_tier(round_name: str) -> str:
-    """Classify bracket round for medal placement (finals > semi > quarter > early)."""
-    name = (round_name or "").strip().lower()
-    if name in ("finals round", "match 0"):
-        return "finals"
-    if name.startswith("match "):
-        return "finals"
-    if "bronze" in name:
-        return "bronze_match"
-    if "semi" in name and "quarter" not in name:
-        return "semi"
-    if "quarter" in name or "1/8" in name or "round of 16" in name:
-        return "quarter"
-    if any(x in name for x in ("1/16", "1/32", "1/64", "1/128", "round of 32", "round of 64")):
-        return "early"
-    return "other"
-
-
-def _bracket_medal_for_archer(archer: ArcherResult) -> str | None:
-    """Podium medal from elimination bracket (at most one per archer per bracket).
-
-    Gold: bracket champion. Silver: lost in the final. Bronze: lost in the semifinal
-  (3rd place). Losses in quarterfinals or earlier do not earn a medal.
-    """
-    if not archer.matches:
-        return None
-
+def _apply_match_bracket_medals(
+    summary: TournamentSummary,
+    archer: ArcherResult,
+    event_name: str,
+    division_name: str,
+) -> None:
     place = match_bracket_placement(archer)
+    if place is None:
+        return
+
+    detail = division_name
     if place == 1:
-        return "gold"
-    if place == 2:
-        return "silver"
-    if place == 3:
-        return "bronze"
-    if place == 4:
-        return None
-
-    ordered = sorted(archer.matches, key=lambda m: -m.round_index)
-    loss_match = None
-    for match in ordered:
-        side = _archer_side_in_match(archer.name, match)
-        if side and not side.won:
-            loss_match = match
-            break
-
-    if loss_match is None:
-        return "gold"
-
-    tier = _bracket_round_tier(loss_match.round_name)
-    if tier == "finals":
-        return "silver"
-    if tier == "semi":
-        return "bronze"
-  # bronze medal match winner/loser handled below if needed
-    if tier == "bronze_match":
-        side = _archer_side_in_match(archer.name, loss_match)
-        if side and side.won:
-            return "bronze"
-    return None
+        _record_medal(summary, "gold", archer.name, event_name, detail)
+        _record_finish(summary, event_name, "1st place")
+    elif place == 2:
+        _record_medal(summary, "silver", archer.name, event_name, detail)
+        _record_finish(summary, event_name, "2nd place")
+    elif place == 3:
+        _record_medal(summary, "bronze", archer.name, event_name, detail)
+        _record_finish(summary, event_name, "3rd place")
+    elif place == 4:
+        _record_finish(summary, event_name, "4th place")
 
 
 def _process_match_highlight(
     summary: TournamentSummary,
     match: MatchResult,
     event_name: str,
-    archer_name: str,
+    division_name: str,
+    archer: ArcherResult,
+    event_type: str,
 ) -> None:
     if len(match.sides) < 2:
         return
-    ours = _archer_side_in_match(archer_name, match) or match.sides[0]
+    archer_name = archer.name
+    ours = next(
+        (s for s in match.sides if s.name.startswith(archer_name) or archer_name in s.name),
+        match.sides[0],
+    )
     opp = match.sides[1] if match.sides[0] is ours else match.sides[0]
 
-    summary.finish_histogram[match.round_name] = summary.finish_histogram.get(match.round_name, 0) + 1
+    _record_finish(summary, event_name, match.round_name)
+
+    if is_team_entry(archer, event_type):
+        return
 
     if ours.won and _was_comeback(ours, opp):
         summary.highlights.append(

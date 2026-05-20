@@ -12,6 +12,36 @@ def _ranking_event(**kwargs) -> EventResult:
     )
 
 
+def test_match_path_gold_medal_winner():
+    archer = ArcherResult(
+        name="Recurve Women Team",
+        club="Test Club",
+        rank=None,
+        total_score=None,
+        matches=[
+            MatchResult(
+                round_name="Semi Finals",
+                round_index=1,
+                sides=[
+                    MatchSide("Recurve Women Team", "Test", 1, "A", [], 6, True),
+                    MatchSide("Other Team", "Other", 2, "B", [], 2, False),
+                ],
+            ),
+            MatchResult(
+                round_name="Finals Round",
+                round_index=0,
+                sides=[
+                    MatchSide("Recurve Women Team", "Test", 1, "A", [], 6, True),
+                    MatchSide("Final Opponent", "Other", 1, "B", [], 4, False),
+                ],
+            ),
+        ],
+    )
+    event = _match_event(divisions=[DivisionResult(name="Recurve College Women", archers=[archer])])
+    text = summarize_archer(event, archer)
+    assert "1st" in text or "gold" in text.lower()
+
+
 def test_match_path_win_then_loss():
     archer = ArcherResult(
         name="Recurve Men Team",

@@ -35,9 +35,10 @@
   <form method="post" action="{{ url_for('profile.add_alias', club_id=club.id) }}" class="form-inline">
     <input type="text" name="alias" placeholder="Alias text" required>
     <select name="match_mode">
+      <option value="exact" selected>Exact</option>
       <option value="contains">Contains</option>
-      <option value="exact">Exact</option>
     </select>
+    <p class="muted">Exact: club field must match alias after normalizing punctuation. Contains: club field must include the alias (use full school names).</p>
     <button type="submit" class="btn btn-small">Add alias</button>
   </form>
 </section>

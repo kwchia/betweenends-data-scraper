@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
-_MIN_REVERSE_CONTAINS_LEN = 8
+_MIN_CONTAINS_ALIAS_LEN = 5
 
 
 @dataclass
@@ -48,6 +48,14 @@ def roster_members_from_display_name(name: str) -> list[str]:
     return [part.strip() for part in parts if part.strip()]
 
 
+def is_team_shaped_fnm(fnm: Optional[str]) -> bool:
+    if not fnm:
+        return False
+    if "\n[" in fnm:
+        return True
+    return fnm.strip().endswith(" Team")
+
+
 def matches_club(
     club_text: str,
     aliases: Iterable[AliasRule],
@@ -62,9 +70,7 @@ def matches_club(
         if rule.match_mode == "exact":
             if club_text == alias:
                 return True
-        elif alias in club_text or (
-            len(club_text) >= _MIN_REVERSE_CONTAINS_LEN and club_text in alias
-        ):
+        elif len(alias) >= _MIN_CONTAINS_ALIAS_LEN and alias in club_text:
             return True
     return False
 
@@ -73,6 +79,6 @@ def archer_club_from_row(tm: Optional[str], fnm: Optional[str] = None) -> str:
     tm = normalize_club_text(tm)
     if tm:
         return tm
-    if fnm:
+    if fnm and is_team_shaped_fnm(fnm):
         return extract_team_name(fnm)
     return ""

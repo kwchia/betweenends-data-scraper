@@ -2,36 +2,9 @@
     <div class="summary-grid">
       <div class="stat-card">
         <h3>Medals</h3>
-        {% set medal_details = medal_highlights_by_tier(summary) %}
-        {% for tier, label, count in [
-          ('gold', 'Gold', summary.medals.gold),
-          ('silver', 'Silver', summary.medals.silver),
-          ('bronze', 'Bronze', summary.medals.bronze),
-        ] %}
-        {% if count %}
-        {% if pdf_mode %}
-        <p class="medal-stat-line"><span class="medal {{ tier }}">{{ count }}</span> {{ label }}</p>
-        <ul class="medal-detail-list">
-          {% for h in medal_details[tier] %}
-          <li>{{ h.detail }}</li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <details class="collapsible medal-stat-collapse">
-          <summary class="collapsible-summary medal-stat-summary">
-            <span class="medal {{ tier }}">{{ count }}</span> {{ label }}
-          </summary>
-          <ul class="medal-detail-list">
-            {% for h in medal_details[tier] %}
-            <li>{{ h.detail }}</li>
-            {% endfor %}
-          </ul>
-        </details>
-        {% endif %}
-        {% else %}
-        <p class="medal-stat-line"><span class="medal {{ tier }}">0</span> {{ label }}</p>
-        {% endif %}
-        {% endfor %}
+        <div class="medals-list">
+        {% include "tournaments/_medals.html" %}
+        </div>
       </div>
       <div class="stat-card">
         <h3>Roster</h3>
@@ -59,14 +32,12 @@
         <p class="medal-stat-line">0 archers across {{ summary.total_events_with_results }} event(s)</p>
         {% endif %}
       </div>
-      {% if summary.finish_histogram %}
-      <div class="stat-card">
+      {% if summary.finishes_by_event %}
+      <div class="stat-card finishes-card">
         <h3>Finishes</h3>
-        <ul>
-          {% for label, count in summary.finish_histogram.items() %}
-          <li>{{ label }}: {{ count }}</li>
-          {% endfor %}
-        </ul>
+        <div class="finishes-by-event">
+        {% include "tournaments/_finishes.html" %}
+        </div>
       </div>
       {% endif %}
     </div>
@@ -85,6 +56,13 @@
     </section>
     {% endif %}
   </div>
+
+  {% if summary.individual_roster or summary.team_roster %}
+  <div class="tab-panel{% if pdf_mode %} pdf-section{% endif %}" id="roster">
+    <h2>Roster</h2>
+    {% include "tournaments/_roster.html" %}
+  </div>
+  {% endif %}
 
   {% for event in events %}
   <div class="tab-panel{% if pdf_mode %} pdf-section{% endif %}" id="event-{{ event.event_id }}">

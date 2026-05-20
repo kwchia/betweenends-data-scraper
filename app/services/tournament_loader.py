@@ -9,7 +9,7 @@ from app.services.summary import TournamentSummary, build_summary
 def club_alias_rules(club: Club) -> list[AliasRule]:
     aliases = [AliasRule(alias=a.alias, match_mode=a.match_mode) for a in club.aliases]
     if not aliases:
-        aliases = [AliasRule(alias=club.name, match_mode="contains")]
+        aliases = [AliasRule(alias=club.name, match_mode="exact")]
     return aliases
 
 

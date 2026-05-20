@@ -1,14 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from app.services import scoring
 from app.services.archer_filter import ArcherIdentity, matches_archer
-from app.services.club_filter import AliasRule, archer_club_from_row, extract_team_name, matches_club
-from app.services.custom_points import (
-    is_award_custom_points_event,
-    is_medal_custom_points_event,
-    overall_standings_rows,
-)
+from app.services.club_filter import AliasRule, archer_club_from_row, extract_team_name, matches_club, normalize_for_match
 
 
 @dataclass
@@ -160,6 +155,22 @@ def _ranking_rows_for_division(
     return rows
 
 
+def _assign_competition_ranks(archers: list["ArcherResult"]) -> None:
+    """Assign division standing from scores (ties share the same place)."""
+    ordered = sorted(
+        archers,
+        key=lambda a: (-(a.total_score or 0), a.name.lower()),
+    )
+    for index, archer in enumerate(ordered):
+        if index == 0:
+            archer.rank = 1
+        elif (archer.total_score or 0) < (ordered[index - 1].total_score or 0):
+            archer.rank = index + 1
+        else:
+            archer.rank = ordered[index - 1].rank
+
+
+
 def _parse_ranking(
     event_data: dict,
     scores_data: Optional[dict],
@@ -178,35 +189,37 @@ def _parse_ranking(
     for cg in event_data.get("cgs") or []:
         if not cg:
             continue
-        division_archers = []
-        standings = _ranking_rows_for_division(
-            cg, archers_map, scores_map, num_rounds, arrows_per_round
-        )
-        for tournament_rank, (aid, archer, total, arrows, round_scores) in enumerate(
-            standings, start=1
-        ):
-            matched, reason = _row_matches(archer, aliases, archer_identity)
+        # Build all archers with scores for proper rank assignment
+        all_rows = _ranking_rows_for_division(cg, archers_map, scores_map, num_rounds, arrows_per_round)
+        all_results: list[tuple[ArcherResult, dict]] = []
+        for aid, archer_dict, total, arrows, round_scores in all_rows:
+            result = ArcherResult(
+                name=f"{archer_dict.get('fnm', '')} {archer_dict.get('lnm', '')}".strip(),
+                club=archer_club_from_row(archer_dict.get("tm")),
+                rank=None,
+                total_score=total,
+                round_scores=round_scores,
+                aid=aid,
+                arrow_string=arrows if store_arrows else None,
+                round_arrow_strings=(
+                    _split_round_arrows(arrows, num_rounds, arrows_per_round)
+                    if store_arrows
+                    else []
+                ),
+            )
+            all_results.append((result, archer_dict))
+
+        # Assign ranks based on full division scores (handles ties)
+        _assign_competition_ranks([r for r, _ in all_results])
+
+        # Filter to matched archers
+        division_archers: list[ArcherResult] = []
+        for archer_result, archer_dict in all_results:
+            matched, reason = _row_matches(archer_dict, aliases, archer_identity)
             if not matched:
                 continue
-
-            club = archer_club_from_row(archer.get("tm"))
-            division_archers.append(
-                ArcherResult(
-                    name=f"{archer.get('fnm', '')} {archer.get('lnm', '')}".strip(),
-                    club=club,
-                    rank=tournament_rank,
-                    total_score=total,
-                    round_scores=round_scores,
-                    aid=aid,
-                    arrow_string=arrows if store_arrows else None,
-                    round_arrow_strings=(
-                        _split_round_arrows(arrows, num_rounds, arrows_per_round)
-                        if store_arrows
-                        else []
-                    ),
-                    match_reason=reason,
-                )
-            )
+            archer_result.match_reason = reason
+            division_archers.append(archer_result)
 
         division_archers.sort(key=lambda a: a.rank or 9999)
 
@@ -384,83 +397,214 @@ def _match_display_name(mr: dict) -> str:
     return "--Bye--"
 
 
+def _coerce_rank(rank) -> Optional[int]:
+    if rank is None:
+        return None
+    try:
+        return int(rank)
+    except (TypeError, ValueError):
+        return None
+
+
+def _custom_points_rows(event_data: dict) -> list[dict]:
+    rows: list[dict] = []
+    for block in event_data.get("data") or []:
+        for row in block or []:
+            if row:
+                rows.append(row)
+    return rows
+
+
+def _custom_points_event_title(event_data: dict) -> str:
+    return event_data.get("enm") or event_data.get("event_name") or "Team Points"
+
+
+_ORG_NAME_MARKERS = ("University", "College", " Institute", " School", " Team")
+
+
+def _is_custom_points_team_archer(archer_info: dict, name: str, club: str) -> bool:
+    """Organization/team rows use a display name without a separate person last name."""
+    if (archer_info.get("lname") or "").strip():
+        return False
+    fname = (archer_info.get("fname") or "").strip()
+    if not fname:
+        return False
+    if any(marker in fname for marker in _ORG_NAME_MARKERS):
+        return True
+    if club:
+        club_n = normalize_for_match(club)
+        name_n = normalize_for_match(name)
+        fname_n = normalize_for_match(fname)
+        if name_n == club_n or club_n in fname_n or fname_n in club_n:
+            return True
+    return False
+
+
+def _custom_points_archer_identity(
+    aid_key: Any,
+    archers_map: dict,
+) -> Optional[tuple[str, str, str]]:
+    archer_info = archers_map.get(str(aid_key)) or archers_map.get(aid_key) or {}
+    fname = archer_info.get("fname", "")
+    lname = archer_info.get("lname", "")
+    name = f"{fname} {lname}".strip() or fname
+    club = archer_club_from_row(archer_info.get("tm"), fname) or extract_team_name(fname) or name
+    if not name:
+        return None
+    return name, club, normalize_for_match(club)
+
+
+def _points_from_score_entry(score_entry: dict) -> float:
+    points = score_entry.get("points")
+    if points is None:
+        points = score_entry.get("score")
+    return float(points or 0)
+
+
+def _archer_from_custom_points_row(
+    aid_key: Any,
+    score_entry: dict,
+    archers_map: dict,
+    aliases: list[AliasRule],
+    archer_identity: Optional[ArcherIdentity] = None,
+) -> Optional[ArcherResult]:
+    identity = _custom_points_archer_identity(aid_key, archers_map)
+    if identity is None:
+        return None
+    name, club, _club_key = identity
+    if archer_identity:
+        archer_info = archers_map.get(str(aid_key)) or archers_map.get(aid_key) or {}
+        raw = {
+            "fnm": archer_info.get("fname", ""),
+            "lnm": archer_info.get("lname", ""),
+            **archer_info,
+        }
+        matched, reason = matches_archer(raw, archer_identity)
+        if not matched:
+            return None
+    else:
+        if not matches_club(club, aliases):
+            return None
+        reason = None
+    rank = _coerce_rank(score_entry.get("rank"))
+    return ArcherResult(
+        name=name,
+        club=club,
+        rank=rank,
+        total_score=None,
+        points=_points_from_score_entry(score_entry),
+        match_reason=reason,
+    )
+
+
+def _should_aggregate_team_championship(rows: list[dict], archers_map: dict) -> bool:
+    """Overall team championships list many component rows; standing is by total points."""
+    if len(rows) < 2:
+        return False
+    cnd_names = {row.get("cnd_name") for row in rows if row.get("cnd_name")}
+    if len(cnd_names) != 1:
+        return False
+    for row in rows:
+        scores = row.get("scores") or {}
+        if not scores:
+            continue
+        aid_key = next(iter(scores))
+        archer_info = archers_map.get(str(aid_key)) or archers_map.get(aid_key) or {}
+        fname = archer_info.get("fname", "")
+        lname = archer_info.get("lname", "")
+        name = f"{fname} {lname}".strip() or fname
+        club = archer_club_from_row(archer_info.get("tm"), fname) or extract_team_name(fname) or name
+        return _is_custom_points_team_archer(archer_info, name, club)
+    return False
+
+
+def _parse_aggregated_team_championship(
+    event_data: dict,
+    rows: list[dict],
+    archers_map: dict,
+    aliases: list[AliasRule],
+) -> list[DivisionResult]:
+    totals: dict[str, float] = {}
+    meta: dict[str, tuple[str, str]] = {}
+
+    for row in rows:
+        for aid_key, score_entry in (row.get("scores") or {}).items():
+            identity = _custom_points_archer_identity(aid_key, archers_map)
+            if identity is None:
+                continue
+            name, club, club_key = identity
+            totals[club_key] = totals.get(club_key, 0.0) + _points_from_score_entry(score_entry)
+            meta[club_key] = (name, club)
+
+    if not totals:
+        return []
+
+    ranked = sorted(totals.items(), key=lambda item: (-item[1], meta[item[0]][0].lower()))
+    division_archers: list[ArcherResult] = []
+    for overall_rank, (club_key, total_points) in enumerate(ranked, start=1):
+        name, club = meta[club_key]
+        if not matches_club(club, aliases):
+            continue
+        division_archers.append(
+            ArcherResult(
+                name=name,
+                club=club,
+                rank=overall_rank,
+                total_score=None,
+                points=total_points,
+            )
+        )
+
+    if not division_archers:
+        return []
+
+    return [DivisionResult(name="Overall", archers=division_archers)]
+
+
+def _parse_custom_points_tables(
+    rows: list[dict],
+    archers_map: dict,
+    aliases: list[AliasRule],
+    archer_identity: Optional[ArcherIdentity] = None,
+) -> list[DivisionResult]:
+    divisions: list[DivisionResult] = []
+
+    for row in rows:
+        division_archers: list[ArcherResult] = []
+        for aid_key, score_entry in (row.get("scores") or {}).items():
+            archer = _archer_from_custom_points_row(aid_key, score_entry, archers_map, aliases, archer_identity)
+            if archer is not None:
+                division_archers.append(archer)
+
+        if not division_archers:
+            continue
+
+        division_archers.sort(key=lambda a: (a.rank or 9999, a.name.lower()))
+        division_name = (
+            row.get("column_label")
+            or row.get("short_label")
+            or row.get("cnd_name")
+            or "Points"
+        )
+        divisions.append(DivisionResult(name=division_name, archers=division_archers))
+
+    return divisions
+
+
 def _parse_custom_points(
     event_data: dict,
     aliases: list[AliasRule],
-    archer_identity: Optional[ArcherIdentity],
+    archer_identity: Optional[ArcherIdentity] = None,
 ) -> list[DivisionResult]:
     archers_map = event_data.get("archers") or {}
-    divisions: list[DivisionResult] = []
-    default_event_name = event_data.get("event_name") or event_data.get("enm") or "Team Points"
-
-    if archer_identity and is_award_custom_points_event(default_event_name):
+    rows = _custom_points_rows(event_data)
+    if not rows:
         return []
 
-    medal_standings_event = is_medal_custom_points_event(default_event_name)
+    if not archer_identity and _should_aggregate_team_championship(rows, archers_map):
+        return _parse_aggregated_team_championship(event_data, rows, archers_map, aliases)
 
-    for block in event_data.get("data") or []:
-        block_rows = list(block or [])
-        rows_to_parse = (
-            overall_standings_rows(block_rows) if medal_standings_event else block_rows
-        )
-        for row in rows_to_parse:
-            scores = row.get("scores") or {}
-            if not scores:
-                continue
-            row_label = row.get("nm") or row.get("name") or row.get("label")
-            division_name = row_label or default_event_name
-            if medal_standings_event and not row_label:
-                division_name = default_event_name
-
-            rank_by_aid = {
-                str(aid_key): rank
-                for rank, (aid_key, _score_entry) in enumerate(
-                    sorted(
-                        scores.items(),
-                        key=lambda item: (
-                            -float(
-                                item[1].get("points")
-                                if item[1].get("points") is not None
-                                else item[1].get("score") or 0
-                            ),
-                            int(item[0]) if str(item[0]).isdigit() else 0,
-                        ),
-                    ),
-                    start=1,
-                )
-            }
-
-            division_archers = []
-            for aid_key, score_entry in scores.items():
-                archer_info = archers_map.get(str(aid_key)) or archers_map.get(aid_key) or {}
-                raw = {
-                    "fnm": archer_info.get("fname", ""),
-                    "lnm": archer_info.get("lname", ""),
-                    **archer_info,
-                }
-                matched, reason = _row_matches(raw, aliases, archer_identity)
-                if not matched:
-                    continue
-                fname = archer_info.get("fname", "")
-                lname = archer_info.get("lname", "")
-                display_name = extract_team_name(fname) or f"{fname} {lname}".strip() or fname
-                club = extract_team_name(fname) or display_name
-                team_rank = rank_by_aid.get(str(aid_key)) or score_entry.get("rank")
-                division_archers.append(
-                    ArcherResult(
-                        name=display_name,
-                        club=club,
-                        rank=int(team_rank) if team_rank is not None else None,
-                        total_score=None,
-                        points=score_entry.get("points") or score_entry.get("score"),
-                        match_reason=reason,
-                    )
-                )
-
-            if division_archers:
-                division_archers.sort(key=lambda a: (a.rank or 9999))
-                divisions.append(
-                    DivisionResult(name=division_name, archers=division_archers)
-                )
-
+    divisions = _parse_custom_points_tables(rows, archers_map, aliases, archer_identity)
+    if len(divisions) == 1:
+        divisions[0].name = _custom_points_event_title(event_data)
     return divisions

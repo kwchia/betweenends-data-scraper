@@ -1,0 +1,38 @@
+{% macro medal_list(winners) %}
+<ul class="medal-winners">
+  {% for w in winners %}
+  <li>
+    <strong>{{ w.archer_name }}</strong>
+    <span class="muted">{{ w.detail }} · {{ w.event_name }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{% macro medal_row(tier, label, css_class, count, winners) %}
+{% if pdf_mode %}
+<p><span class="medal {{ css_class }}">{{ count }}</span> {{ label }}</p>
+{% if winners %}{{ medal_list(winners) }}{% endif %}
+{% else %}
+<details class="collapsible medal-collapse"{% if count == 0 %} data-empty="true"{% endif %}>
+  <summary class="collapsible-summary">
+    <span class="collapsible-title">
+      <span class="medal {{ css_class }}">{{ count }}</span> {{ label }}
+    </span>
+  </summary>
+  <div class="collapsible-body">
+    {% if winners %}
+    {{ medal_list(winners) }}
+    {% elif count > 0 %}
+    <p class="muted">Details unavailable for this saved snapshot. Re-save from tournament results to refresh.</p>
+    {% else %}
+    <p class="muted">No {{ label|lower }} medals recorded.</p>
+    {% endif %}
+  </div>
+</details>
+{% endif %}
+{% endmacro %}
+
+{{ medal_row("gold", "Gold", "gold", summary.medals.gold, summary.medals.gold_winners) }}
+{{ medal_row("silver", "Silver", "silver", summary.medals.silver, summary.medals.silver_winners) }}
+{{ medal_row("bronze", "Bronze", "bronze", summary.medals.bronze, summary.medals.bronze_winners) }}
