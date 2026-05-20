@@ -264,3 +264,174 @@ input[type="text"], input[type="email"], input[type="password"], select, textare
 .library-actions .btn { margin-right: 0.25rem; }
 
 .tab-panel.pdf-section { display: block; }
+
+.mode-switch {
+  display: flex;
+  gap: 0;
+  margin: 0 1rem;
+}
+.mode-btn {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.mode-btn:first-child { border-radius: 6px 0 0 6px; }
+.mode-btn:last-child { border-radius: 0 6px 6px 0; }
+.mode-btn.active { background: #fff; color: var(--primary); font-weight: 600; }
+
+.btn-secondary { background: #546e7a; color: #fff; }
+.btn-secondary:hover { background: #455a64; }
+
+.scan-controls { margin: 1rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.scan-progress { flex: 1 1 100%; margin-top: 0.5rem; }
+.scan-progress.hidden { display: none; }
+.progress-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.metadata-section { margin-bottom: 1rem; }
+.metadata-collapse { margin-bottom: 0; }
+.metadata-collapse > .collapsible-summary .collapsible-title { font-size: 1.15rem; }
+.metadata-collapse .collapsible-body { padding-top: 0.75rem; }
+.metadata-event { margin-bottom: 0.75rem; }
+.metadata-event h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.metadata-section .metadata-form { margin-bottom: 0.5rem; }
+.metadata-form fieldset.metadata-round {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  margin: 0;
+}
+.metadata-form legend { font-weight: 600; padding: 0 0.25rem; font-size: 0.9rem; }
+.metadata-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+.metadata-field {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-weight: 600;
+  flex: 0 1 auto;
+}
+.metadata-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+.metadata-field input[type="text"] {
+  width: 5.5rem;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.9rem;
+  margin: 0;
+}
+.metadata-field input[name="conditions"] { width: 7.5rem; }
+.metadata-row .btn { margin: 0; flex-shrink: 0; }
+
+.analytics-tabs { margin: 1rem 0; }
+.analytics-tabs .tab-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 6px;
+  cursor: pointer;
+  margin-right: 0.25rem;
+}
+.analytics-tabs .tab-btn.active { background: var(--primary); color: #fff; }
+
+.queue-list { list-style: none; padding: 0; }
+.queue-item {
+  padding: 0.6rem 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.4rem;
+}
+.queue-item .badge { margin-left: 0.5rem; }
+.queue-processing .badge { background: #e3f2fd; color: var(--primary); }
+.queue-completed .badge { background: #e8f5e9; color: var(--success); }
+.queue-failed .badge, .queue-not_found .badge { background: #ffebee; color: var(--error); }
+.hidden { display: none; }
+
+#archer-practice-section { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.practice-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+.practice-name-field { flex: 1 1 14rem; max-width: 20rem; margin: 0; }
+.practice-name-field input { width: 100%; }
+.practice-date-field { flex: 0 0 auto; margin: 0; }
+.practice-score-summary {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+.practice-arrows-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+.practice-arrows-config label { margin: 0; font-weight: 600; }
+.practice-arrow-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.practice-arrow-grid th,
+.practice-arrow-grid td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+}
+.practice-arrow-grid .arrow-cell-input {
+  width: 2.25rem;
+  text-align: center;
+  padding: 0.25rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.practice-arrow-grid .end-total-cell,
+.practice-arrow-grid .running-total-cell,
+.practice-arrow-grid .round-grid-total {
+  font-weight: 600;
+  background: #f8fafc;
+}
+.practice-round {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--card);
+}
+.practice-entry-mode { display: flex; gap: 1rem; margin: 0.5rem 0; flex-wrap: wrap; }
+.practice-entry-mode label { font-weight: normal; }
+.practice-total-field input,
+.practice-arrows-field input[type="text"] { max-width: 20rem; }
+.checkbox-label { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: normal; }
+.form-actions { margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; }
+.analytics-filter { margin-bottom: 1rem; }
+.tab-help { margin-top: 0; margin-bottom: 0.75rem; font-size: 0.9rem; }
+.elim-seed-table { margin-top: 1rem; font-size: 0.9rem; }
+.small { font-size: 0.85rem; }

@@ -8,11 +8,22 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="{{ url_for('tournaments.index') }}" class="brand">Betweenends Coach</a>
+    <a href="{{ url_for('root') }}" class="brand">Betweenends Coach</a>
+    {% if current_user.is_authenticated %}
+    <form method="post" action="{{ url_for('archer.set_mode') }}" class="mode-switch">
+      <button type="submit" name="mode" value="club" class="mode-btn{% if app_mode == 'club' %} active{% endif %}">Club Coach</button>
+      <button type="submit" name="mode" value="archer" class="mode-btn{% if app_mode == 'archer' %} active{% endif %}">My Results</button>
+    </form>
+    {% endif %}
     <div class="nav-links">
       {% if current_user.is_authenticated %}
-        <a href="{{ url_for('tournaments.index') }}">Tournaments</a>
-        <a href="{{ url_for('library.index') }}">Library</a>
+        {% if app_mode == 'archer' %}
+          <a href="{{ url_for('archer.library') }}">My Library</a>
+          <a href="{{ url_for('archer.analytics') }}">Analytics</a>
+        {% else %}
+          <a href="{{ url_for('tournaments.index') }}">Tournaments</a>
+          <a href="{{ url_for('library.index') }}">Library</a>
+        {% endif %}
         <a href="{{ url_for('profile.index') }}">Profile</a>
         <a href="{{ url_for('auth.logout') }}">Logout</a>
       {% else %}

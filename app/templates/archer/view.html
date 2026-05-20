@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.tournament_name }} — My Library{% endblock %}
+{% block content %}
+<header class="results-header">
+  <h1>{{ tournament.tournament_name }}</h1>
+  <p class="muted">{{ tournament.location }} · {{ tournament.start_date }} – {{ tournament.end_date }}</p>
+  <p class="muted">Matched by: {{ saved.match_reason or 'name' }} · Saved {{ saved.saved_at.strftime('%Y-%m-%d') }}</p>
+  <form method="post" action="{{ url_for('archer.library_delete', saved_id=saved.id) }}" class="inline-form" onsubmit="return confirm('Remove this tournament?');">
+    <button type="submit" class="btn btn-danger">Remove from Library</button>
+  </form>
+</header>
+
+<section class="section metadata-section">
+  <details class="collapsible metadata-collapse">
+    <summary class="collapsible-summary">
+      <span class="collapsible-title">Round details</span>
+      <span class="section-summary">Distance and conditions per round (for analytics)</span>
+    </summary>
+    <div class="collapsible-body">
+  {% for event in events %}
+  {% if event.event_type in ('RankingEvent', 'CombinedRankingEvent') and event.divisions %}
+  <div class="form-card metadata-event">
+    <h3>{{ event.event_name }}</h3>
+    {% for archer in event.divisions[0].archers %}
+    {% set round_count = archer.round_scores|length if archer.round_scores else (event.num_rounds or 1) %}
+    {% for r in range(round_count) %}
+    {% set meta = round_metadata(user_metadata, event.event_id, r) %}
+    <form method="post" action="{{ url_for('archer.library_metadata', saved_id=saved.id) }}" class="metadata-form">
+      <input type="hidden" name="event_id" value="{{ event.event_id }}">
+      <input type="hidden" name="round_index" value="{{ r }}">
+      <fieldset class="metadata-round">
+        <legend>Round {{ r + 1 }}</legend>
+        <div class="metadata-row">
+          <label class="metadata-field">
+            <span class="metadata-label">Dist.</span>
+            <input type="text" name="distance" placeholder="18m" maxlength="12" value="{{ meta.distance }}">
+          </label>
+          <label class="metadata-field">
+            <span class="metadata-label">Cond.</span>
+            <input type="text" name="conditions" placeholder="windy" maxlength="24" value="{{ meta.conditions }}">
+          </label>
+          <button type="submit" class="btn btn-small btn-primary">Save</button>
+        </div>
+      </fieldset>
+    </form>
+    {% endfor %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endfor %}
+    </div>
+  </details>
+</section>
+
+{% set pdf_mode = false %}
+{% set club_name = 'You' %}
+{% include "tournaments/_results_body.html" %}
+
+<p><a href="{{ url_for('archer.library') }}">← Back to My Library</a></p>
+
+{% if events %}
+<script src="{{ url_for('static', filename='js/tabs.js') }}"></script>
+{% endif %}
+{% endblock %}

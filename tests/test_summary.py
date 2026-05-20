@@ -1,6 +1,7 @@
 from app.services.event_parsers import ArcherResult, DivisionResult, EventResult, MatchResult, MatchSide
 from app.services.summary import (
     build_summary,
+    collect_club_roster,
     count_unique_archers,
     is_team_entry,
 )

@@ -4,6 +4,7 @@ from app.services.club_filter import (
     extract_team_name,
     is_team_shaped_fnm,
     matches_club,
+    roster_members_from_display_name,
 )
 
 
@@ -21,6 +22,14 @@ def test_matches_exact():
 def test_extract_team_name():
     fnm = "Lindsey Wilson College\n[Tanner Boyd & A.J. Shagool]"
     assert extract_team_name(fnm) == "Lindsey Wilson College"
+
+
+def test_roster_members_from_display_name():
+    fnm = "Lindsey Wilson College\n[Tanner Boyd & A.J. Shagool]"
+    assert roster_members_from_display_name(fnm) == ["Tanner Boyd", "A.J. Shagool"]
+    match_name = "UC San Diego [Alice Smith & Bob Jones]"
+    assert roster_members_from_display_name(match_name) == ["Alice Smith", "Bob Jones"]
+    assert roster_members_from_display_name("Alice Smith") == []
 
 
 def test_archer_club_from_row_prefers_tm():

@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, field
 
-from app.services.club_filter import normalize_for_match
+from app.services.club_filter import normalize_for_match, roster_members_from_display_name
 from app.services.event_parsers import ArcherResult, EventResult, MatchResult, MatchSide
 
 _MATCH_RANK_SUFFIX = re.compile(r"\s+\(\d+\)$")
@@ -55,6 +55,7 @@ class TournamentSummary:
     individual_roster: list[RosterEntry] = field(default_factory=list)
     team_roster: list[TeamRosterEntry] = field(default_factory=list)
     highlights: list[Highlight] = field(default_factory=list)
+    roster: list[str] = field(default_factory=list)
     total_archers: int = 0
     total_events_with_results: int = 0
 
@@ -154,6 +155,21 @@ def build_team_roster(events: list[EventResult]) -> list[TeamRosterEntry]:
     return teams
 
 
+def unique_archer_names(events: list[EventResult]) -> list[str]:
+    seen: dict[str, str] = {}
+    for event in events:
+        if event.event_type not in _INDIVIDUAL_EVENT_TYPES:
+            continue
+        for division in event.divisions:
+            for archer in division.archers:
+                if is_team_entry(archer, event.event_type):
+                    continue
+                key = _archer_identity(archer.name)
+                if key and key not in seen:
+                    seen[key] = _roster_display_name(archer.name)
+    return sorted(seen.values(), key=str.casefold)
+
+
 def count_unique_archers(events: list[EventResult]) -> int:
     seen: set[str] = set()
     for event in events:
@@ -167,8 +183,36 @@ def count_unique_archers(events: list[EventResult]) -> int:
     return len(seen)
 
 
-def build_summary(events: list[EventResult]) -> TournamentSummary:
+def _roster_display_name(name: str) -> str:
+    return _MATCH_RANK_SUFFIX.sub("", name).strip()
+
+
+def collect_club_roster(events: list[EventResult]) -> list[str]:
+    """Unique individual archers for a club (excludes team-points rows)."""
+    seen: dict[str, str] = {}
+    for event in events:
+        if event.event_type == "CustomPointsEvent":
+            continue
+        for division in event.divisions:
+            for archer in division.archers:
+                members = roster_members_from_display_name(archer.name)
+                if not members:
+                    members = [_roster_display_name(archer.name)]
+                for member in members:
+                    key = _archer_identity(member)
+                    if key and key not in seen:
+                        seen[key] = _roster_display_name(member)
+    return sorted(seen.values(), key=str.casefold)
+
+
+def build_summary(
+    events: list[EventResult],
+    *,
+    count_bracket_medals: bool = True,
+    club_roster: bool = False,
+) -> TournamentSummary:
     summary = TournamentSummary()
+    bracket_medals_applied: set[tuple[str, str, str]] = set()
 
     for event in events:
         has_results = False
@@ -214,6 +258,10 @@ def build_summary(events: list[EventResult]) -> TournamentSummary:
     summary.total_archers = count_unique_archers(events)
     summary.individual_roster = build_individual_roster(events)
     summary.team_roster = build_team_roster(events)
+    if club_roster:
+        summary.roster = collect_club_roster(events)
+    else:
+        summary.roster = unique_archer_names(events)
     summary.highlights = _dedupe_highlights(summary.highlights)
     summary.highlights.sort(
         key=lambda h: (
@@ -299,7 +347,7 @@ def _is_finals_stage_round(round_name: str, round_index: int) -> bool:
 
 
 def _is_semifinal_round(round_name: str, round_index: int) -> bool:
-    if "Semi" in round_name:
+    if "Semi" in round_name and "quarter" not in round_name.lower():
         return True
     return round_index == 1 and round_name.startswith("Match ")
 
@@ -312,14 +360,13 @@ def _archer_side_in_match(match: MatchResult, archer_name: str) -> MatchSide | N
 
 
 def match_bracket_placement(archer: ArcherResult) -> int | None:
-    """
-    Derive elimination podium finish from bracket results.
+    """Derive elimination podium finish from bracket results.
 
     Gold: won semifinal and final (gold-medal match).
     Silver: won semifinal, lost final.
     Bronze: lost semifinal, won the bronze-medal match (also in the finals stage).
     4th: lost semifinal and bronze-medal match.
-  """
+    """
     if not archer.matches:
         return None
 
@@ -452,6 +499,21 @@ def _parse_set_points(display: str) -> int:
         return int(display) if display else 0
     except ValueError:
         return 0
+
+
+def medal_highlights_by_tier(summary: TournamentSummary) -> dict[str, list[Highlight]]:
+    """Medal highlights grouped for the summary tab (gold / silver / bronze)."""
+    tiers: dict[str, list[Highlight]] = {"gold": [], "silver": [], "bronze": []}
+    for highlight in summary.highlights:
+        if highlight.kind != "medal":
+            continue
+        if highlight.title.startswith("Gold"):
+            tiers["gold"].append(highlight)
+        elif highlight.title.startswith("Silver"):
+            tiers["silver"].append(highlight)
+        elif highlight.title.startswith("Bronze"):
+            tiers["bronze"].append(highlight)
+    return tiers
 
 
 def _dedupe_highlights(highlights: list[Highlight]) -> list[Highlight]:

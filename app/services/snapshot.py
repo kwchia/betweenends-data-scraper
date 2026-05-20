@@ -19,7 +19,9 @@ from app.services.summary import (
     TournamentSummary,
     build_individual_roster,
     build_team_roster,
+    collect_club_roster,
     count_unique_archers,
+    unique_archer_names,
 )
 
 
@@ -42,13 +44,19 @@ def build_snapshot(
     }
 
 
-def load_snapshot(data: dict) -> tuple[dict, list[EventResult], TournamentSummary]:
+def load_snapshot(
+    data: dict, *, club_roster: bool = False
+) -> tuple[dict, list[EventResult], TournamentSummary]:
     tournament = data.get("tournament") or {}
     events = [_event_from_dict(e) for e in data.get("events") or []]
     summary = _summary_from_dict(data.get("summary") or {})
     summary.total_archers = count_unique_archers(events)
     summary.individual_roster = build_individual_roster(events)
     summary.team_roster = build_team_roster(events)
+    if club_roster:
+        summary.roster = collect_club_roster(events)
+    else:
+        summary.roster = unique_archer_names(events)
     return tournament, events, summary
 
 
@@ -59,6 +67,9 @@ def _event_from_dict(data: dict) -> EventResult:
         event_type=data["event_type"],
         display_order=data.get("display_order", 0),
         divisions=[_division_from_dict(d) for d in data.get("divisions") or []],
+        arrows_per_end=data.get("arrows_per_end"),
+        ends_per_round=data.get("ends_per_round"),
+        num_rounds=data.get("num_rounds"),
     )
 
 
@@ -79,6 +90,10 @@ def _archer_from_dict(data: dict) -> ArcherResult:
         round_scores=data.get("round_scores") or [],
         matches=[_match_from_dict(m) for m in data.get("matches") or []],
         points=data.get("points"),
+        aid=data.get("aid"),
+        arrow_string=data.get("arrow_string"),
+        round_arrow_strings=data.get("round_arrow_strings") or [],
+        match_reason=data.get("match_reason"),
     )
 
 
@@ -99,6 +114,7 @@ def _match_side_from_dict(data: dict) -> MatchSide:
         end_scores=[EndScore(**e) for e in data.get("end_scores") or []],
         total=data.get("total", 0),
         won=data.get("won", False),
+        arrow_string=data.get("arrow_string"),
     )
 
 
@@ -164,6 +180,7 @@ def _summary_from_dict(data: dict) -> TournamentSummary:
         individual_roster=_roster_from_legacy(data),
         team_roster=[TeamRosterEntry(**t) for t in data.get("team_roster") or []],
         highlights=[Highlight(**h) for h in data.get("highlights") or []],
+        roster=list(data.get("roster") or []),
         total_archers=data.get("total_archers", 0),
         total_events_with_results=data.get("total_events_with_results", 0),
     )
