@@ -49,16 +49,24 @@
     queueList.innerHTML = "";
     activeItems.forEach(function (item) {
       const li = document.createElement("li");
+      const badge = document.createElement("span");
       li.className = "queue-item queue-" + item.status;
       li.dataset.id = item.id;
-      li.innerHTML =
-        item.tournament_name +
-        ' <span class="badge">' +
-        item.status +
-        "</span>" +
-        (item.error_message
-          ? ' <span class="muted">' + item.error_message + "</span>"
-          : "");
+      li.appendChild(document.createTextNode(item.tournament_name));
+
+      li.appendChild(document.createTextNode(" "));
+      badge.className = "badge";
+      badge.textContent = item.status;
+      li.appendChild(badge);
+
+      if (item.error_message) {
+        const muted = document.createElement("span");
+        li.appendChild(document.createTextNode(" "));
+        muted.className = "muted";
+        muted.textContent = item.error_message;
+        li.appendChild(muted);
+      }
+
       queueList.appendChild(li);
     });
     if (queueEmpty) {
